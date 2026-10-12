@@ -119,3 +119,72 @@ describe("planStars", () => {
 		expect(plan.unstar.id).toEqual([]);
 	});
 });
+
+import { matchExisting } from "../index";
+
+describe("matchExisting", () => {
+	const rec = (
+		id: string,
+		over: Partial<{
+			isrcs: string[];
+			mbRecordingId: string | null;
+			title: string;
+			durationMs: number;
+		}> = {},
+	) => ({
+		id,
+		isrcs: [],
+		mbRecordingId: null,
+		title: "Teardrop",
+		artists: ["Massive Attack"],
+		durationMs: 330_000,
+		...over,
+	});
+
+	it("matches by ISRC, then MBID, then artist + title + duration, and ignores Lyterion's own files", () => {
+		const songs = [
+			{ id: "isrc", title: "x", path: "beets/a.flac", isrc: ["gbum71029604"] },
+			{ id: "mb", title: "y", path: "beets/b.flac", musicBrainzId: "mb-1" },
+			{
+				id: "fuzzy",
+				title: "Angel",
+				artist: "Massive Attack",
+				duration: 379,
+				path: "beets/c.flac",
+			},
+			{
+				id: "ours",
+				title: "Mezzanine",
+				artist: "Massive Attack",
+				duration: 300,
+				path: "lyterion/d.flac",
+			},
+			{
+				id: "live",
+				title: "Inertia Creeps (Live)",
+				artist: "Massive Attack",
+				duration: 357,
+				path: "beets/e.flac",
+			},
+		];
+		const matches = matchExisting(
+			[
+				rec("r-isrc", { isrcs: ["GBUM71029604"] }),
+				rec("r-mb", { mbRecordingId: "mb-1", title: "Other" }),
+				rec("r-fuzzy", { title: "Angel", durationMs: 378_000 }),
+				rec("r-ours", { title: "Mezzanine", durationMs: 300_000 }),
+				rec("r-studio", { title: "Inertia Creeps", durationMs: 357_000 }),
+				rec("r-far", { title: "Angel", durationMs: 300_000 }),
+			],
+			songs,
+			"lyterion",
+		);
+		expect(Object.fromEntries([...matches].map(([k, v]) => [k, v.id]))).toEqual(
+			{
+				"r-isrc": "isrc",
+				"r-mb": "mb",
+				"r-fuzzy": "fuzzy",
+			},
+		);
+	});
+});

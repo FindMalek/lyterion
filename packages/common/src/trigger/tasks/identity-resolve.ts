@@ -1,8 +1,11 @@
+import { env } from "@lyterion/env/server";
 import { idempotencyKeys, logger, task } from "@trigger.dev/sdk";
 
 import { recordingsToAcquire } from "../../acquire/persist";
-
+import { getCredentials } from "../../credentials/store";
 import { runIdentityResolve } from "../../identity/persist";
+import { createNavidromeClient } from "../../navidrome/client";
+import { indexExistingLibrary } from "../../navidrome/index-persist";
 import { finishRun } from "../../pipeline/advance";
 import { updateStageProgress } from "../../pipeline/progress";
 import { chunk } from "../utils/chunk";
@@ -31,6 +34,24 @@ export const identityResolveTask = task({
 				failed: 0,
 				finishedAt: new Date().toISOString(),
 			});
+			// library.index (#18): what the owner already has never gets queued.
+			const navidrome = await getCredentials("navidrome");
+			if (navidrome) {
+				try {
+					const indexed = await indexExistingLibrary(
+						createNavidromeClient(navidrome),
+						{
+							musicDir: env.LYTERION_MUSIC_DIR,
+							librarySubdir: env.LYTERION_LIBRARY_SUBDIR,
+						},
+					);
+					logger.info("existing library indexed", indexed);
+				} catch (err) {
+					logger.warn("library.index failed, continuing without it", {
+						error: String(err),
+					});
+				}
+			}
 			const todo = await recordingsToAcquire();
 			await updateStageProgress(runId, ACQUIRE_STAGE, {
 				status: todo.length > 0 ? "running" : "done",

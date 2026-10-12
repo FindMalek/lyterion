@@ -14,6 +14,12 @@ export type SubsonicSong = {
 	artistId?: string;
 	duration?: number;
 	starred?: string;
+	suffix?: string;
+	bitRate?: number;
+	samplingRate?: number;
+	bitDepth?: number;
+	isrc?: string[];
+	musicBrainzId?: string;
 };
 
 export type ScanStatus = { scanning: boolean; count?: number };
