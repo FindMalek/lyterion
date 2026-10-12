@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { db } from "@lyterion/db";
@@ -223,6 +223,7 @@ export async function recordOutcome(
 					rank: attempt.rank,
 					state: attempt.state,
 					failureReason: attempt.failureReason,
+					stagedPath: attempt.stagedPath,
 				})
 				.onConflictDoUpdate({
 					target: [candidate.recordingId, candidate.providerId, candidate.ref],
@@ -230,6 +231,7 @@ export async function recordOutcome(
 						rank: sql`excluded.rank`,
 						state: sql`excluded.state`,
 						failureReason: sql`excluded.failure_reason`,
+						stagedPath: sql`coalesce(excluded.staged_path, ${candidate.stagedPath})`,
 						matchConfidence: sql`excluded.match_confidence`,
 					},
 				})
@@ -300,4 +302,20 @@ export async function recordingsToAcquire(): Promise<
 		.select({ id: recording.id, generation: recording.generation })
 		.from(recording)
 		.where(inArray(recording.status, ["resolved", "missing"]));
+}
+
+export function reviewDir(stagingDir: string, recordingId: string): string {
+	return path.join(stagingDir, "review", recordingId);
+}
+
+export async function moveToReview(
+	stagingDir: string,
+	recordingId: string,
+	file: string,
+): Promise<string> {
+	const dir = reviewDir(stagingDir, recordingId);
+	await mkdir(dir, { recursive: true });
+	const dest = path.join(dir, path.basename(file));
+	await rename(file, dest);
+	return dest;
 }

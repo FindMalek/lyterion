@@ -114,6 +114,8 @@ export const candidate = pgTable(
 			.notNull()
 			.default("new"),
 		failureReason: text("failure_reason"),
+		// A near miss kept for the review queue's audio preview (#34).
+		stagedPath: text("staged_path"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
 	(table) => [

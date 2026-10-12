@@ -8,6 +8,7 @@ import { authClient } from "@/shared/api/auth-client";
 
 const NAV = [
 	{ href: "/", label: "overview" },
+	{ href: "/review", label: "review" },
 	{ href: "/connections", label: "connections" },
 ] as const;
 

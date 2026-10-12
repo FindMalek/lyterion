@@ -152,4 +152,26 @@ describe("acquireRecording", () => {
 			attempts: [],
 		});
 	});
+
+	it("keeps near misses for review instead of deleting them", async () => {
+		const slskd = fakeProvider("slskd", "C", [{ ref: "maybe" }]);
+		const { deps: d } = await deps(
+			[slskd],
+			() => ({ ok: false, reason: "low_confidence" }) as VerifyResult,
+		);
+		const kept: string[] = [];
+		const outcome = await acquireRecording(target, {
+			...d,
+			keepForReview: async (p) => {
+				kept.push(p);
+				return `/staging/review/r1/${path.basename(p)}`;
+			},
+		});
+		expect(outcome.status).toBe("review");
+		expect(kept).toHaveLength(1);
+		if (outcome.status === "placed" || outcome.status === "paused") return;
+		expect(outcome.attempts[0]?.stagedPath).toBe(
+			"/staging/review/r1/maybe.flac",
+		);
+	});
 });

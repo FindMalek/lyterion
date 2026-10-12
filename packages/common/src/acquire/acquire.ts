@@ -21,6 +21,7 @@ export type AttemptLog = {
 	rank: number;
 	state: "new" | "failed" | "chosen";
 	failureReason?: string;
+	stagedPath?: string;
 };
 
 export type AcquireOutcome =
@@ -44,6 +45,8 @@ export type AcquireDeps = {
 		candidate: Candidate,
 		verify: VerifiedOk,
 	) => Promise<string>;
+	/** Moves a near miss somewhere the review queue can play it; without it near misses are deleted. */
+	keepForReview?: (path: string, candidate: Candidate) => Promise<string>;
 	reliability?: Map<ProviderId, number>;
 	maxAttempts?: number;
 	fetchRetries?: number;
@@ -124,7 +127,16 @@ export async function acquireRecording(
 				if (!verdict.ok) {
 					attempt.state = "failed";
 					attempt.failureReason = `verify: ${verdict.reason}`;
-					if (verdict.reason === "low_confidence") cameClose = true;
+					if (verdict.reason === "low_confidence") {
+						cameClose = true;
+						if (deps.keepForReview) {
+							attempt.stagedPath = await deps.keepForReview(
+								fetched.path,
+								attempt.candidate,
+							);
+							continue;
+						}
+					}
 					await rm(fetched.path, { force: true });
 					continue;
 				}

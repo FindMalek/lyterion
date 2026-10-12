@@ -1,0 +1,1 @@
+ALTER TABLE "candidate" ADD COLUMN "staged_path" text;

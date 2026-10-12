@@ -6,6 +6,7 @@ import { diskGuard } from "../../acquire/disk";
 import {
 	createPlacer,
 	loadAcquireJob,
+	moveToReview,
 	recordOutcome,
 	setRecordingStatus,
 } from "../../acquire/persist";
@@ -65,6 +66,8 @@ export const acquireRecordingTask = task({
 					lookup ? { lookupFingerprint: (fp) => lookup.lookup(fp) } : {},
 				),
 			place: createPlacer(job, placeOptions),
+			keepForReview: (path) =>
+				moveToReview(env.LYTERION_STAGING_DIR, payload.recordingId, path),
 		});
 
 		if (outcome.status === "paused") {

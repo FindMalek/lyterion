@@ -14,6 +14,9 @@
 		"./pipeline/start": {
 			"default": "./src/pipeline/start.ts"
 		},
+		"./review": {
+			"default": "./src/review/persist.ts"
+		},
 		"./credentials": {
 			"default": "./src/credentials/index.ts"
 		},

@@ -9,11 +9,30 @@ import type { spotifyExportTask } from "../trigger/tasks/spotify-export";
 export class StartRunError extends Error {}
 
 // The api only triggers by id, so it needs the Trigger.dev secret key, not the task code.
-export async function startMigrationRun(): Promise<{ runId: number }> {
+function configureTrigger() {
 	if (!env.LYTERION_TRIGGER_API_URL || !env.LYTERION_TRIGGER_SECRET_KEY)
 		throw new StartRunError(
 			"Trigger.dev is not connected (LYTERION_TRIGGER_API_URL and LYTERION_TRIGGER_SECRET_KEY)",
 		);
+	configure({
+		baseURL: env.LYTERION_TRIGGER_API_URL,
+		accessToken: env.LYTERION_TRIGGER_SECRET_KEY,
+	});
+}
+
+export async function triggerTask(id: string, payload: unknown): Promise<void> {
+	configureTrigger();
+	try {
+		await tasks.trigger(id, payload);
+	} catch (err) {
+		throw new StartRunError(
+			`Trigger.dev refused ${id}: ${err instanceof Error ? err.message : String(err)}`,
+		);
+	}
+}
+
+export async function startMigrationRun(): Promise<{ runId: number }> {
+	configureTrigger();
 	const [running] = await db
 		.select({ id: migrationRun.id })
 		.from(migrationRun)
@@ -21,10 +40,6 @@ export async function startMigrationRun(): Promise<{ runId: number }> {
 		.limit(1);
 	if (running) throw new StartRunError(`run ${running.id} is still running`);
 
-	configure({
-		baseURL: env.LYTERION_TRIGGER_API_URL,
-		accessToken: env.LYTERION_TRIGGER_SECRET_KEY,
-	});
 	const [run] = await db
 		.insert(migrationRun)
 		.values({})
