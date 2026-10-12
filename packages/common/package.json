@@ -10,9 +10,13 @@
 	"exports": {
 		".": {
 			"default": "./src/index.ts"
+		},
+		"./trigger/tasks/*": {
+			"default": "./src/trigger/tasks/*.ts"
 		}
 	},
 	"dependencies": {
+		"@lyterion/core": "workspace:*",
 		"@lyterion/db": "workspace:*",
 		"@lyterion/env": "workspace:*",
 		"@lyterion/logger": "workspace:*",

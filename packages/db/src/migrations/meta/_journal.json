@@ -15,6 +15,13 @@
 			"when": 1791808744404,
 			"tag": "0001_mysterious_mongoose",
 			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1791809221387,
+			"tag": "0002_pink_juggernaut",
+			"breakpoints": true
 		}
 	]
 }

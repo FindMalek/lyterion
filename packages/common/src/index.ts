@@ -10,5 +10,7 @@ export * from "./library/tags";
 export * from "./notify/ntfy";
 export * from "./providers/rank";
 export * from "./providers/types";
+export * from "./spotify/client";
+export * from "./spotify/export";
 export { chunk } from "./trigger/utils/chunk";
 export * from "./verify/index";
