@@ -29,6 +29,16 @@ back to Spotify.
 Existing tags from the source are wiped first, so no junk tags survive from
 slskd rips.
 
+Written by `packages/common/python/write_tags.py` (mutagen), which handles
+FLAC, Ogg Vorbis, Opus, MP3 and M4A. It follows Picard naming:
+`MUSICBRAINZ_TRACKID` holds the **recording** MBID and
+`MUSICBRAINZ_RELEASETRACKID` the per-release track MBID.
+
+**Check on 0.64:** Navidrome's default `PID.Track` starts with
+`musicbrainz_trackid`, so the two copies of a song kept for two saved albums
+(D-018) share it and may collide. If they do, set `PID.Track` to
+`musicbrainz_releasetrackid|albumid,discnumber,tracknumber,title`.
+
 ## Layout
 
 ```
