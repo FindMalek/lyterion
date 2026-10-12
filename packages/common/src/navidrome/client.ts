@@ -115,6 +115,35 @@ export function createNavidromeClient(
 			}>("getArtists");
 			return (reply.artists?.index ?? []).flatMap((i) => i.artist ?? []);
 		},
+		async playlists(): Promise<{ id: string; name: string }[]> {
+			const reply = await call<{
+				playlists?: { playlist?: { id: string; name: string }[] };
+			}>("getPlaylists");
+			return reply.playlists?.playlist ?? [];
+		},
+		async playlistSongs(id: string): Promise<string[]> {
+			const reply = await call<{ playlist?: { entry?: { id: string }[] } }>(
+				"getPlaylist",
+				{ id },
+			);
+			return (reply.playlist?.entry ?? []).map((e) => e.id);
+		},
+		async createPlaylist(name: string): Promise<string | null> {
+			const reply = await call<{ playlist?: { id: string } }>(
+				"createPlaylist",
+				{ name },
+			);
+			return reply.playlist?.id ?? null;
+		},
+		async removeFromPlaylist(playlistId: string, indexes: number[]) {
+			await call("updatePlaylist", {
+				playlistId,
+				songIndexToRemove: indexes.map(String),
+			});
+		},
+		async setRating(id: string, rating: number) {
+			await call("setRating", { id, rating: String(rating) });
+		},
 		async star(ids: {
 			id?: string[];
 			albumId?: string[];

@@ -150,6 +150,9 @@ export const libraryFile = pgTable(
 		sourceRef: text("source_ref"),
 		upgradeReason: text("upgrade_reason"),
 		upgradePriority: integer("upgrade_priority"),
+		// Which owner signal flagged it (D-032), so the right one is cleared after the swap.
+		upgradeSignal: text("upgrade_signal").$type<"rating" | "playlist">(),
+		upgradeNotifiedAt: timestamp("upgrade_notified_at"),
 		navidromeSongId: text("navidrome_song_id"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
