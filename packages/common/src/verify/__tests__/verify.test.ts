@@ -76,6 +76,21 @@ describe.skipIf(!hasFfmpeg)("verifyFile", () => {
 		}
 	});
 
+	it("refuses YouTube files when no fingerprint lookup is configured (#38)", async () => {
+		const result = await verifyFile(noise("yt.flac"), {
+			durationMs: 12_000,
+			mbRecordingIds: [],
+			candidate: {
+				...flac,
+				providerId: "youtube",
+				format: "opus",
+				isrcMatch: false,
+				matchConfidence: 0.95,
+			},
+		});
+		expect(result).toMatchObject({ ok: false, reason: "no_fingerprint" });
+	});
+
 	it("rejects a file whose length is off by more than the tolerance", async () => {
 		const result = await verifyFile(noise("short.flac"), {
 			durationMs: 200_000,

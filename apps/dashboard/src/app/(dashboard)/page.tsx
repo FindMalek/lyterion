@@ -1,5 +1,6 @@
-import { ConnectionsTable } from "@/components/app/connections-table";
+import { OverviewStats } from "@/components/app/overview-stats";
 import { RunsTable } from "@/components/app/runs-table";
+import { SetupChecklist } from "@/components/app/setup-checklist";
 import { PageHeader } from "@/components/shared/page-header";
 
 export default function OverviewPage() {
@@ -7,12 +8,11 @@ export default function OverviewPage() {
 		<>
 			<PageHeader
 				title="Overview"
-				description="connections and migration runs"
+				description="setup, services and migration runs"
 			/>
-			<div className="grid divide-y border-b lg:grid-cols-2 lg:divide-x lg:divide-y-0">
-				<ConnectionsTable />
-				<RunsTable />
-			</div>
+			<SetupChecklist />
+			<OverviewStats />
+			<RunsTable />
 		</>
 	);
 }

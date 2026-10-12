@@ -1,4 +1,4 @@
-"""Replace every tag on one audio file. Input on stdin: {"path", "tags": {KEY: [values]}, "cover": path|null}."""
+"""Replace every tag on one audio file, or with "merge": true set only the given keys. Input on stdin: {"path", "tags": {KEY: [values]}, "cover": path|null, "merge": bool}."""
 import base64
 import json
 import sys
@@ -90,13 +90,33 @@ def write_mp4(audio, tags, cover):
     audio.save()
 
 
+def merge_tags(path, audio, tags):
+    if isinstance(audio, MP4):
+        for key, values in tags.items():
+            atom = MP4_ATOMS.get(key, f"----:com.apple.iTunes:{key}")
+            audio.tags[atom] = values if key in MP4_ATOMS else [MP4FreeForm(v.encode("utf-8")) for v in values]
+        audio.save()
+    elif type(audio).__name__ in ("MP3", "EasyMP3"):
+        id3 = ID3(path)
+        for key, values in tags.items():
+            id3.delall(f"TXXX:{key}")
+            id3.add(TXXX(encoding=3, desc=key, text=values))
+        id3.save(path, v2_version=4)
+    else:
+        for key, values in tags.items():
+            audio[key] = values
+        audio.save()
+
+
 def main():
     spec = json.load(sys.stdin)
     path, tags, cover = spec["path"], spec["tags"], spec.get("cover")
     audio = mutagen.File(path)
     if audio is None:
         raise SystemExit(f"unsupported file: {path}")
-    if isinstance(audio, MP4):
+    if spec.get("merge"):
+        merge_tags(path, audio, tags)
+    elif isinstance(audio, MP4):
         write_mp4(audio, dict(tags), cover)
     elif type(audio).__name__ in ("MP3", "EasyMP3"):
         write_id3(path, tags, cover)

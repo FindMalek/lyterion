@@ -22,6 +22,62 @@
 			"when": 1791809221387,
 			"tag": "0002_pink_juggernaut",
 			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1791819244321,
+			"tag": "0003_lumpy_joshua_kane",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1791820076551,
+			"tag": "0004_misty_mephisto",
+			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "7",
+			"when": 1791820672331,
+			"tag": "0005_chilly_iron_man",
+			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1791821132088,
+			"tag": "0006_lean_genesis",
+			"breakpoints": true
+		},
+		{
+			"idx": 7,
+			"version": "7",
+			"when": 1791821543426,
+			"tag": "0007_burly_shooting_star",
+			"breakpoints": true
+		},
+		{
+			"idx": 8,
+			"version": "7",
+			"when": 1791822160553,
+			"tag": "0008_pink_mantis",
+			"breakpoints": true
+		},
+		{
+			"idx": 9,
+			"version": "7",
+			"when": 1791822906384,
+			"tag": "0009_late_silver_sable",
+			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "7",
+			"when": 1791823699141,
+			"tag": "0010_classy_black_queen",
+			"breakpoints": true
 		}
 	]
 }

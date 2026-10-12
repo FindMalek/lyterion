@@ -21,20 +21,25 @@ export function isProviderConfigured(task: AITask): boolean {
 	}
 }
 
-let groqClient: ReturnType<typeof createGroq> | undefined;
+const groqClients = new Map<string, ReturnType<typeof createGroq>>();
 
-function getGroqClient() {
-	groqClient ??= createGroq({ apiKey: env.LYTERION_GROQ_API_KEY });
-	return groqClient;
+// The key comes from the dashboard credentials when given (D-039), else the env var.
+function getGroqClient(apiKey = env.LYTERION_GROQ_API_KEY ?? "") {
+	let client = groqClients.get(apiKey);
+	if (!client) {
+		client = createGroq({ apiKey });
+		groqClients.set(apiKey, client);
+	}
+	return client;
 }
 
 export function getModelId(task: AITask): string {
 	return TASK_MODELS[task];
 }
 
-export function getAIModel(task: AITask): LanguageModel {
+export function getAIModel(task: AITask, apiKey?: string): LanguageModel {
 	switch (getTaskProvider(task)) {
 		case AI_PROVIDER.groq:
-			return getGroqClient()(getModelId(task));
+			return getGroqClient(apiKey)(getModelId(task));
 	}
 }

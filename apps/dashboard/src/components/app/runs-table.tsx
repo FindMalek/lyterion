@@ -8,18 +8,17 @@ import {
 	TableHeader,
 	TableRow,
 } from "@lyterion/ui";
-import { useQuery } from "@tanstack/react-query";
-
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import {
+	formatDateTime,
+	formatDuration,
+	orderedStages,
+	runState,
+} from "@/lib/status";
 import { orpc } from "@/shared/api/orpc";
 
-import { type Status, StatusDot } from "./status-dot";
-
-const RUN_STATUS: Record<string, Status> = {
-	running: "warn",
-	done: "ok",
-	failed: "error",
-	cancelled: "idle",
-};
+import { StatusLabel } from "./status-dot";
 
 export function RunsTable() {
 	const { data } = useQuery({
@@ -27,24 +26,82 @@ export function RunsTable() {
 		refetchInterval: 5_000,
 		meta: { silent: true },
 	});
+	const queryClient = useQueryClient();
+	const start = useMutation({
+		...orpc.runs.start.mutationOptions(),
+		onSuccess: () =>
+			queryClient.invalidateQueries({ queryKey: orpc.runs.list.key() }),
+	});
+	const running = data?.some((run) => run.status === "running") ?? false;
+	const sync = useQuery({
+		...orpc.runs.syncState.queryOptions(),
+		meta: { silent: true },
+	});
+	const [confirmFinal, setConfirmFinal] = useState(false);
 
 	return (
 		<section>
-			<div className="flex h-8 items-center border-b px-3">
+			<div className="flex h-8 items-center justify-between gap-3 border-b px-3">
 				<h2 className="font-medium text-xs uppercase tracking-wide">Runs</h2>
+				<div className="flex min-w-0 items-center gap-3">
+					{start.error && (
+						<span className="truncate font-mono text-destructive text-xs">
+							{start.error.message}
+						</span>
+					)}
+					{sync.data?.dailySync !== false && (
+						<button
+							type="button"
+							disabled={running || start.isPending}
+							onBlur={() => setConfirmFinal(false)}
+							onClick={() => {
+								if (!confirmFinal) return setConfirmFinal(true);
+								setConfirmFinal(false);
+								start.mutate({ mode: "final" });
+							}}
+							className="shrink-0 font-mono text-muted-foreground text-xs hover:text-foreground disabled:text-muted-foreground/50"
+						>
+							{confirmFinal
+								? "click again: full export, then daily sync off"
+								: "final export"}
+						</button>
+					)}
+					<button
+						type="button"
+						disabled={running || start.isPending}
+						onClick={() => start.mutate({})}
+						className="shrink-0 font-mono text-xs hover:text-foreground disabled:text-muted-foreground/50"
+					>
+						{start.isPending
+							? "starting…"
+							: running
+								? "running"
+								: "start run →"}
+					</button>
+				</div>
 			</div>
+			{sync.data && (
+				<p className="border-b px-3 py-1 font-mono text-[11px] text-muted-foreground">
+					{sync.data.dailySync
+						? `daily spotify sync on${sync.data.lastSync ? ` · last export ${formatDateTime(sync.data.lastSync)} utc` : " · first run will be a full export"}`
+						: "daily spotify sync off since the final export"}
+				</p>
+			)}
 			{data && data.length === 0 ? (
-				<p className="px-3 py-2 font-mono text-muted-foreground text-xs">
-					no runs yet
+				<p className="px-3 py-3 text-muted-foreground text-xs">
+					No migration has run yet. Once Spotify, Navidrome and Trigger.dev are
+					connected, a run exports the library, finds every track and places it
+					in Navidrome.
 				</p>
 			) : (
 				<Table className="text-xs">
 					<TableHeader>
 						<TableRow>
-							<TableHead className="h-7 px-3">#</TableHead>
-							<TableHead className="h-7 px-3">status</TableHead>
+							<TableHead className="h-7 w-12 px-3">#</TableHead>
+							<TableHead className="h-7 w-36 px-3">status</TableHead>
 							<TableHead className="h-7 px-3">stages</TableHead>
-							<TableHead className="h-7 px-3">started</TableHead>
+							<TableHead className="h-7 w-36 px-3">started (utc)</TableHead>
+							<TableHead className="h-7 w-20 px-3 text-right">took</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
@@ -54,24 +111,26 @@ export function RunsTable() {
 									{run.id}
 								</TableCell>
 								<TableCell className="px-3 py-1.5">
-									<span className="inline-flex items-center gap-2">
-										<StatusDot status={RUN_STATUS[run.status] ?? "idle"} />
-										<span className="font-mono">{run.status}</span>
-									</span>
+									<StatusLabel {...runState(run)} />
 								</TableCell>
 								<TableCell className="px-3 py-1.5 font-mono text-muted-foreground">
-									{Object.entries(run.stages)
-										.map(
-											([stage, p]) =>
-												`${stage} ${p.done + p.failed}/${p.total}`,
-										)
-										.join("  ")}
+									{orderedStages(run.stages).map(([stage, p]) => (
+										<span key={stage} className="mr-4 whitespace-nowrap">
+											{stage}{" "}
+											<span className="text-foreground">
+												{p.done}/{p.total}
+											</span>
+											{p.failed > 0 && (
+												<span className="text-warning"> !{p.failed}</span>
+											)}
+										</span>
+									))}
 								</TableCell>
 								<TableCell className="px-3 py-1.5 font-mono">
-									{new Date(run.startedAt)
-										.toISOString()
-										.slice(0, 16)
-										.replace("T", " ")}
+									{formatDateTime(run.startedAt)}
+								</TableCell>
+								<TableCell className="px-3 py-1.5 text-right font-mono text-muted-foreground">
+									{formatDuration(run.startedAt, run.finishedAt)}
 								</TableCell>
 							</TableRow>
 						))}

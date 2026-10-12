@@ -44,8 +44,8 @@ Manual:
 
 | task | key |
 |---|---|
-| `acquire.recording` | `recording:<id>:<attempt-generation>` |
-| `acquire.release` | `release:<mbid>:<generation>` |
+| `acquire.recording` | `recording:<id>:<run>:<generation>`: placed recordings are never queued again, misses get one try per run |
+| `acquire.release` | `release:<id>:<run>:<generation>`: one slskd album search when ≥ 3 wanted recordings share a placed release, then each track as `acquire.recording` would |
 | `library.place` | the file's content hash, so a re-place is a no-op |
 | `playlists.write` | playlist ID plus content hash |
 

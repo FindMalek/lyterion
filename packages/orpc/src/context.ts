@@ -1,6 +1,6 @@
-import { auth } from "@lyterion/core";
+import { getAuth, type Session } from "@lyterion/core";
 
-export type Session = Awaited<ReturnType<typeof auth.api.getSession>>;
+export type { Session };
 
 export type Context = {
 	session: Session;
@@ -8,6 +8,6 @@ export type Context = {
 };
 
 export async function createContext(headers: Headers): Promise<Context> {
-	const session = await auth.api.getSession({ headers });
+	const session = await (await getAuth()).api.getSession({ headers });
 	return { session, headers };
 }

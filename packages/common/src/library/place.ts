@@ -9,9 +9,27 @@ import type { TagMap } from "./tags";
 
 const run = promisify(execFile);
 const EMBEDDED_COVER_MAX_PX = 1200;
-const WRITE_TAGS_SCRIPT = fileURLToPath(
-	new URL("../../python/write_tags.py", import.meta.url),
-);
+// Next to the source in dev; in the bundled Trigger image additionalFiles puts it under the build root.
+const WRITE_TAGS_CANDIDATES = [
+	process.env.LYTERION_WRITE_TAGS_SCRIPT,
+	fileURLToPath(new URL("../../python/write_tags.py", import.meta.url)),
+	join(process.cwd(), "packages/common/python/write_tags.py"),
+	join(process.cwd(), "python/write_tags.py"),
+	join(process.cwd(), "write_tags.py"),
+].filter((p): p is string => !!p);
+
+let writeTagsScript: string | undefined;
+async function resolveWriteTagsScript(): Promise<string> {
+	if (writeTagsScript) return writeTagsScript;
+	for (const candidate of WRITE_TAGS_CANDIDATES)
+		if (await exists(candidate)) {
+			writeTagsScript = candidate;
+			return candidate;
+		}
+	throw new Error(
+		`write_tags.py not found (looked in ${WRITE_TAGS_CANDIDATES.join(", ")})`,
+	);
+}
 
 export type PlaceOptions = {
 	musicDir: string;
@@ -88,22 +106,27 @@ export function writeTags(
 	tags: TagMap,
 	cover: string | null,
 	python = "python3",
+	merge = false,
 ): Promise<void> {
-	return new Promise((resolvePromise, reject) => {
-		const child = spawn(python, [WRITE_TAGS_SCRIPT], {
-			stdio: ["pipe", "pipe", "pipe"],
-		});
-		let stderr = "";
-		child.stderr.on("data", (chunk) => {
-			stderr += chunk;
-		});
-		child.on("error", reject);
-		child.on("close", (code) => {
-			if (code === 0) resolvePromise();
-			else reject(new Error(`write_tags failed (${code}): ${stderr.trim()}`));
-		});
-		child.stdin.end(JSON.stringify({ path, tags, cover }));
-	});
+	return resolveWriteTagsScript().then(
+		(script) =>
+			new Promise<void>((resolvePromise, reject) => {
+				const child = spawn(python, [script], {
+					stdio: ["pipe", "pipe", "pipe"],
+				});
+				let stderr = "";
+				child.stderr.on("data", (chunk) => {
+					stderr += chunk;
+				});
+				child.on("error", reject);
+				child.on("close", (code) => {
+					if (code === 0) resolvePromise();
+					else
+						reject(new Error(`write_tags failed (${code}): ${stderr.trim()}`));
+				});
+				child.stdin.end(JSON.stringify({ path, tags, cover, merge }));
+			}),
+	);
 }
 
 async function exists(path: string): Promise<boolean> {

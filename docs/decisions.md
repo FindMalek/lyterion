@@ -410,3 +410,53 @@ can't reach `api.lyterion.findmalek.engineer`: its session check failed and
 every sign-in bounced back to `/login`. Server-side calls now use
 `LYTERION_API_INTERNAL_URL` (`http://<api appName>:3001`), set by
 `scripts/deploy/dokploy.mjs`. The browser keeps using the public url.
+
+## D-039 Service credentials are entered in the dashboard (2026-10-12, amends D-013, #83)
+
+Navidrome, slskd, proxy backends, Deezer ARL, AcoustID, Groq, Jev and ntfy are
+set from Connections, tested live, and stored in `integration_credential` as
+AES-256-GCM ciphertext. The key is `LYTERION_ENCRYPTION_KEY`, or one derived
+from `LYTERION_BETTER_AUTH_SECRET` when unset. Every reader goes through
+`getCredentials(kind)` (`@lyterion/common/credentials`): the dashboard value,
+else the `LYTERION_*` env var, so env-only setups keep working. Secrets never
+go back to the browser; a blank secret field keeps the saved one. The
+Trigger.dev worker needs the same secret to decrypt. Still env-only: the
+Spotify app (Better Auth reads it at boot), Trigger.dev and yt-dlp cookies.
+
+
+## D-040 First run is claimed with a setup code; the Spotify app lives in the DB (2026-10-12, amends D-039, #83)
+
+A fresh instance has no owner, so `/login` sends the visitor to
+`/onboarding`. The api prints a one-time setup code
+(`[onboarding] no owner yet. setup code: XXXX-XXXX-XXXX`) on every boot
+until someone signs in, and onboarding's writes need it, so only someone
+who can read the logs can claim the instance. Steps: setup code → Spotify
+app (walkthrough, redirect uri with a copy button, client id and secret
+checked with a client credentials token) → sign in with Spotify (becomes
+the owner) → Navidrome and the optional services. After that, the Spotify
+app is one more row under Connections.
+
+Better Auth is built lazily (`getAuth()` in `@lyterion/core`) and rebuilt
+when the Spotify app changes: at once in the api, within 30s in the
+Trigger.dev worker. `LYTERION_SPOTIFY_CLIENT_ID` / `_SECRET` are optional
+now and only a fallback.
+
+## D-041 Navidrome 0.64.2 checks, against the real binary (2026-10-12, answers the open checks in D-023, D-026, #30, #44)
+
+Run against the `v0.64.2` linux release with a scratch library, the D-016
+cover priority, and the files Lyterion writes:
+
+- **m3u8 import:** `Playlists/Night Drive.m3u8` with `../Artist/Album/NN
+  Title.ext` paths imports as a read-only playlist owned by the first admin,
+  in file order. It needs an admin to exist: a scan before the first admin
+  logs "Playlists will not be imported" and imports on the next scan.
+- **Sidecar cover:** `Night Drive.jpg` next to the m3u8 becomes the playlist
+  cover (`getCoverArt pl-…` returns that image, not a mosaic).
+- **Smart playlist:** `{"all":[{"is":{"rating":1}}]}` is the right field.
+  `setRating 1` puts the song in `Upgrade queue` at once.
+- **Swap keeps identity:** replacing `01 Angel.flac` with `01 Angel.mp3`
+  tagged by `write_tags.py` keeps the song ID, the 1-star rating, the star and
+  the play count, both with `MUSICBRAINZ_TRACKID` and without it. The
+  scanner logs "Found moved files" and repoints playlist entries itself.
+  Lyterion still rewrites its m3u8 files, because the file on disk would
+  otherwise keep the old extension.

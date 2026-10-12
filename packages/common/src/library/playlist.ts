@@ -64,17 +64,24 @@ export async function writePlaylist(
 	const base = sanitizeSegment(spec.name);
 	const path = join(dir, `${base}.m3u8`);
 	const { content, missing } = renderM3u(spec, dir);
-	const previous = await readOrNull(path);
-	const hash = (value: string) =>
+	const hash = (value: string | Buffer) =>
 		createHash("sha256").update(value).digest("hex");
-	if (previous !== null && hash(previous) === hash(content))
-		return { path, changed: false, missing };
+	const previous = await readOrNull(path);
+	const listChanged = previous === null || hash(previous) !== hash(content);
+	// A new Spotify cover on an unchanged track list still replaces the sidecar.
+	const cover = join(dir, `${base}.jpg`);
+	const coverChanged = spec.coverPath
+		? (await readFile(cover).then(hash, () => null)) !==
+			hash(await readFile(spec.coverPath))
+		: false;
+	if (!listChanged && !coverChanged) return { path, changed: false, missing };
 
 	await mkdir(dir, { recursive: true });
-	await writeFile(`${path}.tmp`, content, "utf8");
-	await rename(`${path}.tmp`, path);
-	if (spec.coverPath) {
-		const cover = join(dir, `${base}.jpg`);
+	if (listChanged) {
+		await writeFile(`${path}.tmp`, content, "utf8");
+		await rename(`${path}.tmp`, path);
+	}
+	if (spec.coverPath && coverChanged) {
 		await copyFile(spec.coverPath, `${cover}.tmp`);
 		await rename(`${cover}.tmp`, cover);
 	}

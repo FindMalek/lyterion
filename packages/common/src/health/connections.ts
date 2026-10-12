@@ -8,6 +8,7 @@ export type ConnectionId =
 	| "navidrome"
 	| "slskd"
 	| "proxy"
+	| "lidarr"
 	| "deezer"
 	| "youtube"
 	| "acoustid"
@@ -27,9 +28,11 @@ export type ConnectionStatus = {
 
 export type ConnectionsEnv = {
 	spotifyLinked: boolean;
+	spotifyApp?: { clientId: string; clientSecret: string };
 	navidrome?: { url: string; user: string; password: string };
 	slskd?: { url: string; apiKey: string };
 	proxyBackends: string[];
+	lidarr?: { url: string; apiKey: string };
 	deezerArl?: string;
 	ytdlpCookiesPath?: string;
 	acoustidKey?: string;
@@ -75,6 +78,39 @@ export function subsonicAuthParams(
 	});
 }
 
+// A client credentials token proves the id and secret pair without a user; sign-in needs the allowlist too.
+export async function testSpotifyApp(
+	app: { clientId: string; clientSecret: string },
+	doFetch: typeof fetch = fetch,
+): Promise<{ ok: boolean; detail?: string }> {
+	const res = await doFetch("https://accounts.spotify.com/api/token", {
+		method: "POST",
+		headers: {
+			Authorization: `Basic ${Buffer.from(`${app.clientId}:${app.clientSecret}`).toString("base64")}`,
+			"Content-Type": "application/x-www-form-urlencoded",
+		},
+		body: "grant_type=client_credentials",
+		signal: AbortSignal.timeout(TIMEOUT_MS),
+	}).catch((err: unknown) => err as Error);
+	if (res instanceof Error)
+		return {
+			ok: false,
+			detail: `accounts.spotify.com unreachable: ${res.cause instanceof Error ? res.cause.message : res.message}`,
+		};
+	if (res.ok) return { ok: true };
+	const body = (await res.json().catch(() => ({}))) as {
+		error?: string;
+		error_description?: string;
+	};
+	return {
+		ok: false,
+		detail:
+			body.error === "invalid_client"
+				? "spotify rejected the client id or secret"
+				: `HTTP ${res.status} ${body.error_description ?? body.error ?? ""}`.trim(),
+	};
+}
+
 export async function checkConnections(
 	env: ConnectionsEnv,
 	doFetch: typeof fetch = fetch,
@@ -83,7 +119,26 @@ export async function checkConnections(
 		doFetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
 
 	const rows: [ConnectionId, string, boolean, Probe | null][] = [
-		["spotify", "Spotify", env.spotifyLinked, null],
+		[
+			"spotify",
+			"Spotify",
+			env.spotifyLinked || !!env.spotifyApp,
+			env.spotifyApp
+				? async () => {
+						const app = await testSpotifyApp(
+							env.spotifyApp as NonNullable<ConnectionsEnv["spotifyApp"]>,
+							doFetch,
+						);
+						if (!app.ok) return app;
+						return {
+							ok: true,
+							detail: env.spotifyLinked
+								? "signed in"
+								: "app ok, sign in with spotify",
+						};
+					}
+				: null,
+		],
 		[
 			"navidrome",
 			"Navidrome",
@@ -99,13 +154,21 @@ export async function checkConnections(
 						const body = (await res.json()) as {
 							"subsonic-response"?: {
 								status?: string;
+								type?: string;
+								version?: string;
+								serverVersion?: string;
 								error?: { message?: string };
 							};
 						};
 						const reply = body["subsonic-response"];
+						const version = reply?.serverVersion ?? reply?.version;
 						return {
 							ok: reply?.status === "ok",
-							detail: reply?.error?.message,
+							detail:
+								reply?.error?.message ??
+								(version
+									? `${reply?.type ?? "subsonic"} ${version}`
+									: undefined),
 						};
 					}
 				: null,
@@ -131,6 +194,25 @@ export async function checkConnections(
 				: null,
 		],
 		[
+			"lidarr",
+			"Lidarr",
+			!!env.lidarr,
+			env.lidarr
+				? async () => {
+						const { url, apiKey } = env.lidarr as NonNullable<
+							ConnectionsEnv["lidarr"]
+						>;
+						const res = await get(
+							`${url.replace(/\/$/, "")}/api/v1/system/status`,
+							{ "X-Api-Key": apiKey },
+						);
+						if (!res.ok) return { ok: false, detail: `HTTP ${res.status}` };
+						const body = (await res.json()) as { version?: string };
+						return { ok: true, detail: `lidarr ${body.version ?? ""}`.trim() };
+					}
+				: null,
+		],
+		[
 			"proxy",
 			"Proxy backends",
 			env.proxyBackends.length > 0,
@@ -152,7 +234,22 @@ export async function checkConnections(
 		["deezer", "Deezer ARL", !!env.deezerArl, null],
 		["youtube", "YouTube Music", !!env.ytdlpCookiesPath, null],
 		["acoustid", "AcoustID", !!env.acoustidKey, null],
-		["groq", "Groq", !!env.groqKey, null],
+		[
+			"groq",
+			"Groq",
+			!!env.groqKey,
+			env.groqKey
+				? async () => {
+						const res = await get("https://api.groq.com/openai/v1/models", {
+							Authorization: `Bearer ${env.groqKey}`,
+						});
+						return {
+							ok: res.ok,
+							detail: res.ok ? undefined : `HTTP ${res.status}`,
+						};
+					}
+				: null,
+		],
 		["jev", "Jev", !!env.jevKey, null],
 		[
 			"ntfy",

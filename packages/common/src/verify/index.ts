@@ -39,7 +39,12 @@ export type VerifyExpectation = {
 export type VerifyResult =
 	| {
 			ok: false;
-			reason: "corrupt" | "duration" | "wrong_recording" | "low_confidence";
+			reason:
+				| "corrupt"
+				| "duration"
+				| "wrong_recording"
+				| "low_confidence"
+				| "no_fingerprint";
 			facts?: AudioFacts;
 	  }
 	| {
@@ -74,6 +79,10 @@ export async function verifyFile(
 	) {
 		return { ok: false, reason: "duration", facts };
 	}
+
+	// YouTube returns covers and live takes for studio queries, so its files must be fingerprinted (#38).
+	if (expect.candidate.providerId === "youtube" && !deps.lookupFingerprint)
+		return { ok: false, reason: "no_fingerprint", facts };
 
 	let fp: Fingerprint | null = null;
 	let verdict: FingerprintVerdict = "unknown";
