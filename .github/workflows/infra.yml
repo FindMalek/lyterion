@@ -4,6 +4,11 @@ name: Infra
 
 on:
   workflow_dispatch:
+    inputs:
+      remove_postgres_ids:
+        description: "Postgres ids to delete instead of deploying the cache (space separated)"
+        required: false
+        default: ""
 
 jobs:
   ci-infra:
@@ -26,3 +31,12 @@ jobs:
           GARAGE_ACCESS_KEY: ${{ secrets.GARAGE_ACCESS_KEY }}
           GARAGE_SECRET_KEY: ${{ secrets.GARAGE_SECRET_KEY }}
         run: node scripts/deploy/dokploy.mjs ci-infra
+        if: inputs.remove_postgres_ids == ''
+
+      - name: Remove orphaned Postgres services
+        if: inputs.remove_postgres_ids != ''
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_PUBLIC_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          POSTGRES_IDS: ${{ inputs.remove_postgres_ids }}
+        run: node scripts/deploy/dokploy.mjs remove-postgres

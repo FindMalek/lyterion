@@ -62,10 +62,22 @@ async function ensureEnvironment(projectName) {
 	return { project, environment };
 }
 
-async function ensurePostgres(environment, name) {
-	const existing = environment.postgres?.find((p) => p.name === name);
-	if (existing)
-		return query("postgres.one", { postgresId: existing.postgresId });
+// project.all hides postgres services the api key wasn't granted, so the id lives in the api app's env (D-037).
+async function storedPostgresId(environment, apiAppName) {
+	const app = environment.applications?.find((a) => a.name === apiAppName);
+	if (!app) return null;
+	const { env } = await query("application.one", {
+		applicationId: app.applicationId,
+	});
+	return parseEnvBlock(env).LYTERION_DB_POSTGRES_ID ?? null;
+}
+
+async function ensurePostgres(environment, name, apiAppName, seedId) {
+	const knownId =
+		(await storedPostgresId(environment, apiAppName)) ??
+		seedId ??
+		environment.postgres?.find((p) => p.name === name)?.postgresId;
+	if (knownId) return query("postgres.one", { postgresId: knownId });
 	const created = await dokploy("postgres.create", {
 		name,
 		appName: name,
@@ -282,6 +294,7 @@ function appSpecs({
 	apiHost,
 	cookieDomain,
 	databaseUrl,
+	postgresId,
 	sharedEnv,
 }) {
 	const dashboardUrl = `https://${dashboardHost}`;
@@ -300,7 +313,12 @@ function appSpecs({
 			host: apiHost,
 			port: 3001,
 			status: "building",
-			env: { ...sharedEnv, ...common, LYTERION_COOKIE_DOMAIN: cookieDomain },
+			env: {
+				...sharedEnv,
+				...common,
+				LYTERION_COOKIE_DOMAIN: cookieDomain,
+				LYTERION_DB_POSTGRES_ID: postgresId,
+			},
 		},
 		{
 			name: tag.startsWith("pr-")
@@ -334,13 +352,18 @@ async function previewUp() {
 	const domain = requireEnv("PREVIEW_DOMAIN");
 	const { environment } = await ensureEnvironment(PREVIEW_PROJECT);
 	environment.projectName = PREVIEW_PROJECT;
-	const pg = await ensurePostgres(environment, `lyterion-db-${tag}`);
+	const pg = await ensurePostgres(
+		environment,
+		`lyterion-db-${tag}`,
+		`lyterion-api-${tag}`,
+	);
 	const apps = appSpecs({
 		tag,
 		dashboardHost: `${tag}.${domain}`,
 		apiHost: `${tag}-api.${domain}`,
 		cookieDomain: domain,
 		databaseUrl: postgresUrl(pg),
+		postgresId: pg.postgresId,
 		sharedEnv: parseEnvBlock(process.env.PREVIEW_APP_ENV),
 	});
 	await upsertComment(renderComment(apps));
@@ -357,16 +380,15 @@ async function previewDown() {
 	const project = await findProject(PREVIEW_PROJECT);
 	const environment = project?.environments?.[0];
 	const rows = [];
+	const postgresId = environment
+		? await storedPostgresId(environment, `lyterion-api-${tag}`)
+		: null;
 	for (const app of environment?.applications ?? []) {
 		if (!app.name.endsWith(`-${tag}`)) continue;
 		await dokploy("application.delete", { applicationId: app.applicationId });
 		rows.push({ name: app.name, status: "deleted" });
 	}
-	for (const pg of environment?.postgres ?? []) {
-		if (pg.name === `lyterion-db-${tag}`) {
-			await dokploy("postgres.remove", { postgresId: pg.postgresId });
-		}
-	}
+	if (postgresId) await dokploy("postgres.remove", { postgresId });
 	if (rows.length > 0) await upsertComment(renderComment(rows));
 }
 
@@ -375,19 +397,34 @@ async function production() {
 	const { environment } = await ensureEnvironment(PRODUCTION_PROJECT);
 	environment.projectName = PRODUCTION_PROJECT;
 	const sharedEnv = parseEnvBlock(process.env.PRODUCTION_APP_ENV);
-	const pg = await ensurePostgres(environment, "lyterion-db");
+	const pg = await ensurePostgres(
+		environment,
+		"lyterion-db",
+		"lyterion-api",
+		process.env.PRODUCTION_POSTGRES_ID,
+	);
 	const apps = appSpecs({
 		tag,
 		dashboardHost: requireEnv("PRODUCTION_DASHBOARD_HOST"),
 		apiHost: requireEnv("PRODUCTION_API_HOST"),
 		cookieDomain: requireEnv("PRODUCTION_DASHBOARD_HOST"),
 		databaseUrl: postgresUrl(pg),
+		postgresId: pg.postgresId,
 		sharedEnv,
 	});
 	const deployed = await deployAll(environment, apps);
 	const ok = await waitForApps(deployed, async () => {});
 	for (const d of deployed) console.info(`${d.name}: ${d.status}`);
 	if (!ok) process.exitCode = 1;
+}
+
+async function removePostgres() {
+	for (const postgresId of requireEnv("POSTGRES_IDS")
+		.split(/[\s,]+/)
+		.filter(Boolean)) {
+		await dokploy("postgres.remove", { postgresId });
+		console.info(`removed postgres ${postgresId}`);
+	}
 }
 
 async function commentFailed() {
@@ -472,6 +509,7 @@ const MODES = {
 	production,
 	"comment-failed": commentFailed,
 	"ci-infra": ciInfra,
+	"remove-postgres": removePostgres,
 };
 
 const run = MODES[MODE];
