@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
-import { checkConnections, subsonicAuthParams } from "../connections";
+import {
+	checkConnections,
+	subsonicAuthParams,
+	testSpotifyApp,
+} from "../connections";
 
 describe("checkConnections", () => {
 	it("probes configured services, reports failures, leaves unconfigured ones unprobed", async () => {
@@ -46,5 +50,32 @@ describe("checkConnections", () => {
 			createHash("md5").update("pwabc").digest("hex"),
 		);
 		expect(params.get("s")).toBe("abc");
+	});
+});
+
+describe("testSpotifyApp", () => {
+	it("names a rejected client id or secret", async () => {
+		const doFetch = (async () =>
+			new Response(JSON.stringify({ error: "invalid_client" }), {
+				status: 400,
+			})) as unknown as typeof fetch;
+		expect(
+			await testSpotifyApp({ clientId: "a", clientSecret: "b" }, doFetch),
+		).toEqual({
+			ok: false,
+			detail: "spotify rejected the client id or secret",
+		});
+	});
+
+	it("accepts a token", async () => {
+		let auth = "";
+		const doFetch = (async (_url: string, init: RequestInit) => {
+			auth = new Headers(init.headers).get("Authorization") ?? "";
+			return new Response(JSON.stringify({ access_token: "x" }));
+		}) as unknown as typeof fetch;
+		expect(
+			await testSpotifyApp({ clientId: "a", clientSecret: "b" }, doFetch),
+		).toEqual({ ok: true });
+		expect(auth).toBe(`Basic ${Buffer.from("a:b").toString("base64")}`);
 	});
 });

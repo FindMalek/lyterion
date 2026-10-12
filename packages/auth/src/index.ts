@@ -8,10 +8,12 @@ import { ownerOnlyGate } from "./owner-gate";
 
 export { ownerOnlyGate } from "./owner-gate";
 
+export type SpotifyApp = { clientId: string; clientSecret: string };
+
 export type AuthEnvConfig = {
 	LYTERION_BETTER_AUTH_SECRET: string;
-	LYTERION_SPOTIFY_CLIENT_ID: string;
-	LYTERION_SPOTIFY_CLIENT_SECRET: string;
+	// Absent until onboarding saves the owner's Spotify app (#83); sessions still resolve without it.
+	spotify: SpotifyApp | null;
 	NEXT_PUBLIC_LYTERION_API_URL: string;
 	NEXT_PUBLIC_LYTERION_DASHBOARD_URL?: string;
 	LYTERION_AUTH_PRODUCTION_URL?: string;
@@ -26,6 +28,10 @@ const SPOTIFY_SCOPES = [
 	"playlist-read-private",
 	"playlist-read-collaborative",
 ];
+
+export function spotifyRedirectUri(apiUrl: string): string {
+	return `${apiUrl}/api/auth/callback/spotify`;
+}
 
 export function createAuth(
 	database: Parameters<typeof drizzleAdapter>[0],
@@ -60,14 +66,15 @@ export function createAuth(
 			productionApiUrl,
 			envConfig.NEXT_PUBLIC_LYTERION_DASHBOARD_URL,
 		].filter((origin): origin is string => origin !== undefined),
-		socialProviders: {
-			spotify: {
-				clientId: envConfig.LYTERION_SPOTIFY_CLIENT_ID,
-				clientSecret: envConfig.LYTERION_SPOTIFY_CLIENT_SECRET,
-				redirectURI: `${productionApiUrl}/api/auth/callback/spotify`,
-				scope: SPOTIFY_SCOPES,
-			},
-		},
+		socialProviders: envConfig.spotify
+			? {
+					spotify: {
+						...envConfig.spotify,
+						redirectURI: spotifyRedirectUri(productionApiUrl),
+						scope: SPOTIFY_SCOPES,
+					},
+				}
+			: {},
 		// nextCookies must be last: it flushes the cookie jar into real Set-Cookie headers.
 		plugins: [
 			oAuthProxy({ productionURL: productionApiUrl, currentURL: apiUrl }),

@@ -1,4 +1,4 @@
-import { auth, database } from "@lyterion/core";
+import { database, getAuth } from "@lyterion/core";
 import { account, user } from "@lyterion/db/schema/auth";
 import { logger, task } from "@trigger.dev/sdk";
 import { and, eq } from "drizzle-orm";
@@ -41,6 +41,7 @@ export function ownerSpotifyClient(selection: {
 	accountId: string;
 }) {
 	return createSpotifyClient(async (forceRefresh) => {
+		const auth = await getAuth();
 		const result = forceRefresh
 			? await auth.api.refreshToken({ body: selection })
 			: await auth.api.getAccessToken({ body: selection });

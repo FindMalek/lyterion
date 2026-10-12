@@ -14,8 +14,9 @@ export async function resolveConnectionsEnv(
 			override?.kind === kind ? override.raw : (await rawCredentials(kind)).raw;
 		return parseCredentials(kind, raw);
 	}
-	const [navidrome, slskd, proxy, deezer, acoustid, groq, jev, ntfy] =
+	const [spotify, navidrome, slskd, proxy, deezer, acoustid, groq, jev, ntfy] =
 		await Promise.all([
+			load("spotify"),
 			load("navidrome"),
 			load("slskd"),
 			load("proxy"),
@@ -27,6 +28,7 @@ export async function resolveConnectionsEnv(
 		]);
 	return {
 		spotifyLinked,
+		spotifyApp: spotify ?? undefined,
 		navidrome: navidrome ?? undefined,
 		slskd: slskd ?? undefined,
 		proxyBackends: proxy?.backends ?? [],

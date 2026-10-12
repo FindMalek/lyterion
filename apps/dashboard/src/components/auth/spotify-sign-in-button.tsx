@@ -8,7 +8,13 @@ import { getSiteUrl } from "@/lib/site-url";
 import { authClient } from "@/shared/api/auth-client";
 
 // Both a returned { error } and a rejected fetch (api down, CORS) must reach the screen, or the button looks dead.
-export function SpotifySignInButton() {
+export function SpotifySignInButton({
+	callbackPath = "/",
+	errorPath = "/login",
+}: {
+	callbackPath?: string;
+	errorPath?: string;
+}) {
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -18,8 +24,8 @@ export function SpotifySignInButton() {
 		const message = await authClient.signIn
 			.social({
 				provider: "spotify",
-				callbackURL: getSiteUrl(),
-				errorCallbackURL: `${getSiteUrl()}/login`,
+				callbackURL: `${getSiteUrl()}${callbackPath}`,
+				errorCallbackURL: `${getSiteUrl()}${errorPath}`,
 			})
 			.then(({ error }) =>
 				error

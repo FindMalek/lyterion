@@ -27,6 +27,7 @@ export type ConnectionStatus = {
 
 export type ConnectionsEnv = {
 	spotifyLinked: boolean;
+	spotifyApp?: { clientId: string; clientSecret: string };
 	navidrome?: { url: string; user: string; password: string };
 	slskd?: { url: string; apiKey: string };
 	proxyBackends: string[];
@@ -75,6 +76,39 @@ export function subsonicAuthParams(
 	});
 }
 
+// A client credentials token proves the id and secret pair without a user; sign-in needs the allowlist too.
+export async function testSpotifyApp(
+	app: { clientId: string; clientSecret: string },
+	doFetch: typeof fetch = fetch,
+): Promise<{ ok: boolean; detail?: string }> {
+	const res = await doFetch("https://accounts.spotify.com/api/token", {
+		method: "POST",
+		headers: {
+			Authorization: `Basic ${Buffer.from(`${app.clientId}:${app.clientSecret}`).toString("base64")}`,
+			"Content-Type": "application/x-www-form-urlencoded",
+		},
+		body: "grant_type=client_credentials",
+		signal: AbortSignal.timeout(TIMEOUT_MS),
+	}).catch((err: unknown) => err as Error);
+	if (res instanceof Error)
+		return {
+			ok: false,
+			detail: `accounts.spotify.com unreachable: ${res.cause instanceof Error ? res.cause.message : res.message}`,
+		};
+	if (res.ok) return { ok: true };
+	const body = (await res.json().catch(() => ({}))) as {
+		error?: string;
+		error_description?: string;
+	};
+	return {
+		ok: false,
+		detail:
+			body.error === "invalid_client"
+				? "spotify rejected the client id or secret"
+				: `HTTP ${res.status} ${body.error_description ?? body.error ?? ""}`.trim(),
+	};
+}
+
 export async function checkConnections(
 	env: ConnectionsEnv,
 	doFetch: typeof fetch = fetch,
@@ -83,7 +117,26 @@ export async function checkConnections(
 		doFetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
 
 	const rows: [ConnectionId, string, boolean, Probe | null][] = [
-		["spotify", "Spotify", env.spotifyLinked, null],
+		[
+			"spotify",
+			"Spotify",
+			env.spotifyLinked || !!env.spotifyApp,
+			env.spotifyApp
+				? async () => {
+						const app = await testSpotifyApp(
+							env.spotifyApp as NonNullable<ConnectionsEnv["spotifyApp"]>,
+							doFetch,
+						);
+						if (!app.ok) return app;
+						return {
+							ok: true,
+							detail: env.spotifyLinked
+								? "signed in"
+								: "app ok, sign in with spotify",
+						};
+					}
+				: null,
+		],
 		[
 			"navidrome",
 			"Navidrome",

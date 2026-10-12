@@ -24,7 +24,10 @@ export function connectionState(row: ConnectionRow): {
 } {
 	if (!row.configured) return { status: "idle", label: "not set" };
 	if (row.ok === false) return { status: "error", label: "down" };
-	if (row.id === "spotify") return { status: "ok", label: "linked" };
+	if (row.id === "spotify")
+		return row.detail?.startsWith("app ok")
+			? { status: "warn", label: "sign in" }
+			: { status: "ok", label: "linked" };
 	return { status: "ok", label: row.ok ? "connected" : "set" };
 }
 

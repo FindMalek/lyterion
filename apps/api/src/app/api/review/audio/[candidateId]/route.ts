@@ -4,7 +4,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 
 import { stagedCandidate } from "@lyterion/common/review";
-import { auth } from "@lyterion/core";
+import { getAuth } from "@lyterion/core";
 import { apiEnv } from "@lyterion/env";
 import type { NextRequest } from "next/server";
 
@@ -24,7 +24,9 @@ export async function GET(
 	req: NextRequest,
 	context: { params: Promise<{ candidateId: string }> },
 ) {
-	const session = await auth.api.getSession({ headers: req.headers });
+	const session = await (await getAuth()).api.getSession({
+		headers: req.headers,
+	});
 	if (!session) return new Response("unauthorized", { status: 401 });
 	const { candidateId } = await context.params;
 	const row = await stagedCandidate(Number(candidateId));

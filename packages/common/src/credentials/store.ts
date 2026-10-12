@@ -1,4 +1,4 @@
-import { database } from "@lyterion/core";
+import { database, resetAuth } from "@lyterion/core";
 import { integrationCredential } from "@lyterion/db/schema/credential";
 import { env } from "@lyterion/env/server";
 import { eq } from "drizzle-orm";
@@ -30,6 +30,11 @@ export function envCredentials(kind: CredentialKind): RawCredentials | null {
 				) as RawCredentials)
 			: null;
 	switch (kind) {
+		case "spotify":
+			return pick({
+				clientId: env.LYTERION_SPOTIFY_CLIENT_ID,
+				clientSecret: env.LYTERION_SPOTIFY_CLIENT_SECRET,
+			});
 		case "navidrome":
 			return pick({
 				url: env.LYTERION_NAVIDROME_URL,
@@ -103,12 +108,14 @@ export async function saveCredentials(
 			target: integrationCredential.kind,
 			set: { payload, updatedAt: new Date() },
 		});
+	if (kind === "spotify") resetAuth();
 }
 
 export async function clearCredentials(kind: CredentialKind): Promise<void> {
 	await database
 		.delete(integrationCredential)
 		.where(eq(integrationCredential.kind, kind));
+	if (kind === "spotify") resetAuth();
 }
 
 export type CredentialForm = {

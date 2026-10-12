@@ -75,13 +75,15 @@ stage (D-014). Progress per stage is stored as JSONB and shown live on the dashb
 
 ```bash
 pnpm install
-cp .env.example .env          # fill the Spotify app and Better Auth secret
+cp .env.example .env          # the Better Auth secret is the only must
 pnpm db:setup                 # Postgres on :5434, then push the schema
 pnpm dev:ad                   # api :3001, dashboard :3002, trigger dev
 ```
 
-The Spotify app needs `http://localhost:3001/api/auth/callback/spotify` as a redirect URI, and the owner
-must be on its allowlist. CI runs `biome ci`, `pnpm build` and `pnpm test`.
+First run: open the dashboard and follow `/onboarding`. It asks for the setup code the api prints on boot,
+walks through creating the Spotify app (redirect URI `http://localhost:3001/api/auth/callback/spotify`,
+owner on its allowlist), signs you in as the owner, then connects Navidrome. No secret needs a redeploy.
+CI runs `biome ci`, `pnpm build` and `pnpm test`.
 
 ## Deploy
 

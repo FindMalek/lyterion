@@ -34,6 +34,9 @@
 		},
 		"./trigger/tasks/*": {
 			"default": "./src/trigger/tasks/*.ts"
+		},
+		"./onboarding": {
+			"default": "./src/onboarding/index.ts"
 		}
 	},
 	"dependencies": {

@@ -3,10 +3,12 @@ import type { RouterClient } from "@orpc/server";
 import { protectedProcedure, publicProcedure } from "../procedures";
 import { connectionsRouter } from "./connections";
 import { libraryRouter } from "./library";
+import { onboardingRouter } from "./onboarding";
 import { reviewRouter } from "./review";
 import { runsRouter } from "./runs";
 
 export const appRouter = {
+	onboarding: onboardingRouter,
 	connections: connectionsRouter,
 	runs: runsRouter,
 	review: reviewRouter,

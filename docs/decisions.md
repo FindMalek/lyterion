@@ -423,3 +423,20 @@ go back to the browser; a blank secret field keeps the saved one. The
 Trigger.dev worker needs the same secret to decrypt. Still env-only: the
 Spotify app (Better Auth reads it at boot), Trigger.dev and yt-dlp cookies.
 
+
+## D-040 First run is claimed with a setup code; the Spotify app lives in the DB (2026-10-12, amends D-039, #83)
+
+A fresh instance has no owner, so `/login` sends the visitor to
+`/onboarding`. The api prints a one-time setup code
+(`[onboarding] no owner yet. setup code: XXXX-XXXX-XXXX`) on every boot
+until someone signs in, and onboarding's writes need it, so only someone
+who can read the logs can claim the instance. Steps: setup code → Spotify
+app (walkthrough, redirect uri with a copy button, client id and secret
+checked with a client credentials token) → sign in with Spotify (becomes
+the owner) → Navidrome and the optional services. After that, the Spotify
+app is one more row under Connections.
+
+Better Auth is built lazily (`getAuth()` in `@lyterion/core`) and rebuilt
+when the Spotify app changes: at once in the api, within 30s in the
+Trigger.dev worker. `LYTERION_SPOTIFY_CLIENT_ID` / `_SECRET` are optional
+now and only a fallback.

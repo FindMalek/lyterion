@@ -14,6 +14,14 @@ const url = z.url().transform((u) => u.replace(/\/$/, ""));
 const key = z.string().trim().min(1);
 
 export const CREDENTIAL_KINDS = {
+	spotify: {
+		schema: z.object({ clientId: key, clientSecret: key }),
+		fields: [
+			{ name: "clientId", label: "client id", secret: false },
+			{ name: "clientSecret", label: "client secret", secret: true },
+		],
+		help: "Your app at developer.spotify.com/dashboard. Changing it signs nobody out; the next sign-in uses the new app.",
+	},
 	navidrome: {
 		schema: z.object({ url, user: key, password: key }),
 		fields: [

@@ -2,6 +2,7 @@ import { LyterionBrandHeader } from "@lyterion/ui";
 import { redirect } from "next/navigation";
 
 import { SpotifySignInButton } from "@/components/auth/spotify-sign-in-button";
+import { serverClient } from "@/shared/api/orpc-server";
 import { getServerSession } from "@/shared/api/session.server";
 
 export default async function LoginPage({
@@ -15,6 +16,9 @@ export default async function LoginPage({
 	if (session?.user) {
 		redirect("/");
 	}
+	// A fresh instance has nobody to sign in yet; claiming it starts with the setup code.
+	const status = await serverClient.onboarding.status().catch(() => null);
+	if (status && !status.hasOwner) redirect("/onboarding");
 
 	return (
 		<div className="flex min-h-svh items-center justify-center bg-background">
