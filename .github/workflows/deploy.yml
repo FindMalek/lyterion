@@ -103,6 +103,7 @@ jobs:
             LYTERION_NTFY_URL=${{ vars.LYTERION_NTFY_URL }}
           PRODUCTION_DASHBOARD_HOST: ${{ vars.PRODUCTION_DASHBOARD_HOST }}
           PRODUCTION_API_HOST: ${{ vars.PRODUCTION_API_HOST }}
+          PRODUCTION_POSTGRES_ID: ${{ vars.PRODUCTION_POSTGRES_ID }}
         run: node scripts/deploy/dokploy.mjs production
 
       - name: Setup pnpm
