@@ -1,0 +1,43 @@
+# Dokploy compose service "lyterion-ci" on the-keep (D-036): GitHub runner + turbo remote cache.
+# Env (set in Dokploy, never committed): GITHUB_RUNNER_PAT, TURBO_TOKEN, GARAGE_ACCESS_KEY, GARAGE_SECRET_KEY, GARAGE_ENDPOINT
+
+services:
+  runner:
+    image: myoung34/github-runner:2.330.0
+    restart: unless-stopped
+    environment:
+      REPO_URL: https://github.com/FindMalek/lyterion
+      RUNNER_SCOPE: repo
+      ACCESS_TOKEN: ${GITHUB_RUNNER_PAT}
+      RUNNER_NAME: the-keep
+      LABELS: the-keep
+      EPHEMERAL: "true"
+      DISABLE_AUTO_UPDATE: "true"
+      RUNNER_WORKDIR: /tmp/runner/work
+    volumes:
+      # Docker socket = root on the host, acceptable only because the repo is private (D-036).
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/runner:/tmp/runner
+    networks:
+      - dokploy-network
+
+  turbo-cache:
+    image: ducktors/turborepo-remote-cache:2.6.1
+    restart: unless-stopped
+    environment:
+      TURBO_TOKEN: ${TURBO_TOKEN}
+      STORAGE_PROVIDER: s3
+      STORAGE_PATH: turbo-cache
+      S3_ACCESS_KEY: ${GARAGE_ACCESS_KEY}
+      S3_SECRET_KEY: ${GARAGE_SECRET_KEY}
+      S3_ENDPOINT: ${GARAGE_ENDPOINT}
+      S3_REGION: garage
+      LOG_LEVEL: info
+    networks:
+      dokploy-network:
+        aliases:
+          - turbo-cache
+
+networks:
+  dokploy-network:
+    external: true

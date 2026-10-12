@@ -329,3 +329,54 @@ The database is LAN-only on `the-keep`, so GitHub runners can't reach it, and
 sonaraem's `drizzle-migrate.yml` isn't copied. The api container runs
 `pnpm db:migrate` before `next start`. Migrations are always generated with
 `pnpm db:generate`.
+
+## D-036 CI, turbo cache and Vercel-style previews, all on `the-keep` (2026-10-12)
+
+Requested by Malek: CI, builds and hosting on Dokploy with per-PR preview
+links like Vercel, the same PR comment layout, and turbo cache.
+
+- **Runner:** a self-hosted GitHub Actions runner on `the-keep`, run as a
+  Dokploy compose service with repo scope and labels `self-hosted,the-keep`.
+  CI jobs run inside the homelab, so they can reach the Dokploy API, the
+  turbo cache, Postgres and Garage over the LAN or tailnet.
+- **Turbo remote cache:** `ducktors/turborepo-remote-cache` on Dokploy,
+  storage in Garage S3 (bucket `turbo-cache`). CI, docker builds and the dev
+  machine (via tailnet `turbo.findmalek.engineer`) share it. Config through
+  `TURBO_API`, `TURBO_TOKEN` and `TURBO_TEAM`.
+- **Images:** one Dockerfile per app using `turbo prune --docker` and Next
+  `output: "standalone"`. The turbo cache is passed into `docker build` as a
+  build secret. Pushed to GHCR as `ghcr.io/findmalek/lyterion-{api,dashboard}`
+  with tags `pr-<n>`, `sha-<sha>` and `main`.
+- **Production:** on push to `main`, build, then redeploy the Dokploy apps
+  `lyterion-dashboard` (`lyterion.findmalek.engineer`) and `lyterion-api`
+  (`api.lyterion.findmalek.engineer`, so the cookie domain is
+  `lyterion.findmalek.engineer`), plus a Dokploy-managed `lyterion-db`, then
+  `pnpm deploy:trigger` to the self-hosted Trigger.dev. The api runs
+  migrations on start (D-035).
+- **Previews:** on PR open/sync, build and tag `pr-<n>`, then call the
+  Dokploy API:
+  - upsert two applications in a `lyterion-previews` project at
+    `pr-<n>.preview.findmalek.engineer` and
+    `pr-<n>-api.preview.findmalek.engineer`
+  - give them their own Dokploy Postgres `lyterion-db-pr-<n>` (like a Neon
+    branch)
+  - deploy
+  On PR close: delete the apps and the Postgres.
+- **Networking:** wildcard DNS `*.preview.findmalek.engineer` → the
+  Tailscale IP. Each domain gets its cert from the existing Traefik `vercel`
+  DNS resolver (`customCertResolver` on `domain.create`), and every router
+  sits behind `tailnet-only@file`, same as the other `*.findmalek.engineer`
+  services.
+- **PR comment, Vercel layout:** one sticky comment found by the hidden
+  marker `<!-- lyterion-preview -->` and edited in place. It reads "The
+  latest updates on your projects", then a table with columns
+  `Project | Deployment | Actions | Updated (UTC)`, one row per app:
+  status (🔄 Building, ✅ Ready, ❌ Failed, 🗑 Deleted), an Inspect link to the
+  Dokploy deployment, and a Preview link.
+- **Spotify login on previews:** Spotify needs exact redirect URIs, so
+  previews use Better Auth's `oAuthProxy` plugin. The OAuth callback goes
+  through the production api, which forwards the session back to the
+  preview.
+- **Trigger.dev on previews:** not deployed. Preview apps get no Trigger
+  key, so triggering is a no-op there. Tasks are tested with `pnpm
+  trigger:dev`.
