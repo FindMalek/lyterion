@@ -478,3 +478,15 @@ cover priority, and the files Lyterion writes:
   rebuilt on each Trigger.dev upgrade), or `apps/librarian` from
   `architecture.md` (no fork, but every fetch, verify, tag and place moves
   behind an HTTP service).
+
+## D-043 Host folders reach runs through a patched supervisor (2026-10-12, answers the open part of D-042, #5)
+
+Malek picked the patched supervisor over `apps/librarian`.
+`infra/the-keep/supervisor/` builds `ghcr.io/findmalek/lyterion-supervisor`
+from the official `supervisor:v4.7.3` image plus one line in the compiled
+Docker workload manager: `Binds` from `DOCKER_RUNNER_BINDS`. The patch
+script fails the build if upstream moves that line, so an upgrade can't
+silently drop the mounts. On each Trigger.dev upgrade, bump the version in
+the compose, the supervisor workflow and `scripts/deploy-trigger.mjs`
+together. The pipeline code is unchanged: tasks keep using local paths
+(`/music`, `/staging`, `/slskd/downloads`).

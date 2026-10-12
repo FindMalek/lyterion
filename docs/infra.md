@@ -200,5 +200,27 @@ Setup, once:
    every tool version (ffmpeg, ffprobe, fpcalc, sox, python3, mutagen,
    yt-dlp) and fails naming any that is missing.
 
-**Not solved here:** run containers get no host mounts (#5, D-042), so the
-acquire tasks can't reach `/srv/music`, staging or slskd's downloads yet.
+**Host folders in runs (#5, D-043):** the supervisor is our own image,
+`ghcr.io/findmalek/lyterion-supervisor`, which is upstream plus
+`DOCKER_RUNNER_BINDS`. Every run gets:
+
+| host | in the run |
+|---|---|
+| `/srv/music` | `/music` (Lyterion writes only under `lyterion/`, D-012) |
+| `/srv/lyterion/staging` | `/staging` |
+| `/srv/lyterion/slskd-downloads` | `/slskd/downloads` |
+
+Override with the compose env `TRIGGER_RUNNER_BINDS` (comma separated,
+`host:container[:ro]`). Before the first Trigger.dev deploy:
+
+1. Actions → Supervisor image → Run (it also runs on every change under
+   `infra/the-keep/supervisor/`).
+2. GitHub → Packages → `lyterion-supervisor` → visibility **public**, so
+   Dokploy pulls it without credentials. It holds only upstream's code and
+   the patch.
+3. On the-keep: `mkdir -p /srv/lyterion/staging /srv/lyterion/slskd-downloads
+   /srv/music/lyterion` and give them to the runs' user
+   (`chown -R 1000:1000` on those three).
+
+`tools.check` also writes and deletes a file in each folder and fails naming
+any that is missing or read-only.

@@ -216,7 +216,8 @@ services:
       - trigger-webapp
 
   supervisor:
-    image: ghcr.io/triggerdotdev/supervisor:${TRIGGER_IMAGE_TAG:-v4.7.3}
+    # Upstream plus DOCKER_RUNNER_BINDS (infra/the-keep/supervisor, D-042); built by .github/workflows/supervisor-image.yml.
+    image: ghcr.io/findmalek/lyterion-supervisor:${TRIGGER_IMAGE_TAG:-v4.7.3}
     restart: unless-stopped
     logging: *logging
     depends_on:
@@ -242,6 +243,8 @@ services:
       DOCKER_HOST: tcp://docker-proxy:2375
       # Runs also join dokploy-network so tasks reach lyterion-db, slskd, Navidrome and ntfy by service name.
       DOCKER_RUNNER_NETWORKS: trigger-webapp,trigger-supervisor,dokploy-network
+      # Host folders every run sees at the paths the LYTERION_* defaults expect (#5).
+      DOCKER_RUNNER_BINDS: ${TRIGGER_RUNNER_BINDS:-/srv/music:/music,/srv/lyterion/staging:/staging,/srv/lyterion/slskd-downloads:/slskd/downloads}
       DOCKER_REGISTRY_URL: ghcr.io
       DOCKER_REGISTRY_USERNAME: ${GHCR_USERNAME}
       DOCKER_REGISTRY_PASSWORD: ${GHCR_READ_TOKEN}
