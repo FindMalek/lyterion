@@ -14,6 +14,7 @@ export * from "./providers/proxy";
 export * from "./providers/rank";
 export * from "./providers/slskd";
 export * from "./providers/types";
+export * from "./providers/youtube";
 export * from "./spotify/client";
 export * from "./spotify/export";
 export { chunk } from "./trigger/utils/chunk";
