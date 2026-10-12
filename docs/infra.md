@@ -61,12 +61,15 @@ Done once. Items marked **Malek** need credentials only Malek has.
    `~/.lyterion-turbo-key.txt` on `the-keep` (mode 600). Endpoint:
    `http://infrastructure-garage-lqdycf-garage-1:3900` on `dokploy-network`,
    region `garage`.
-3. **Malek, GitHub PAT for the runner:** fine-grained, repo
-   `FindMalek/lyterion`, Administration read/write. Goes in
-   `GITHUB_RUNNER_PAT`.
-4. **Dokploy:** create compose `lyterion-ci` from
-   `infra/the-keep/ci.compose.yml` with env `GITHUB_RUNNER_PAT`,
-   `TURBO_TOKEN` (random), `GARAGE_*`.
+3. **Runner registration:** no PAT. A 1h registration token from
+   `gh api -X POST repos/FindMalek/lyterion/actions/runners/registration-token`
+   is stored as secret `RUNNER_TOKEN` right before the first infra deploy.
+   The runner keeps its config in the `runner-data` volume after that.
+4. **Dokploy compose `lyterion-ci`:** deployed by the manual `Infra` workflow
+   (`.github/workflows/infra.yml` → `dokploy.mjs ci-infra`). It runs on GitHub
+   hosted runners against the public Dokploy url, with secrets
+   `DOKPLOY_API_KEY`, `RUNNER_TOKEN`, `TURBO_TOKEN`, `GARAGE_ACCESS_KEY` and
+   `GARAGE_SECRET_KEY`.
 5. **Malek, Dokploy API key:** Settings → Profile → API keys, stored as repo
    secret `DOKPLOY_API_KEY`.
 6. **Malek, GHCR read token:** classic PAT with `read:packages`, stored as
@@ -94,7 +97,9 @@ Done once. Items marked **Malek** need credentials only Malek has.
 
 | secret | value |
 |---|---|
-| `TURBO_TOKEN` | same as the cache server |
+| `TURBO_TOKEN` | random, the infra deploy hands the same value to the cache server |
+| `RUNNER_TOKEN` | runner registration token, only needed for the first infra deploy |
+| `GARAGE_ACCESS_KEY` / `GARAGE_SECRET_KEY` | turbo-cache-key from step 2 |
 | `DOKPLOY_API_KEY` | step 5 |
 | `GHCR_READ_TOKEN` | step 6 |
 | `PREVIEW_APP_ENV` | `LYTERION_BETTER_AUTH_SECRET`, `LYTERION_SPOTIFY_CLIENT_ID`, `LYTERION_SPOTIFY_CLIENT_SECRET`, `LYTERION_AUTH_PRODUCTION_URL=https://api.lyterion.findmalek.engineer`, one `KEY=value` per line |

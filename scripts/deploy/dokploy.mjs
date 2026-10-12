@@ -382,11 +382,61 @@ async function commentFailed() {
 	);
 }
 
+async function ciInfra() {
+	const { readFile } = await import("node:fs/promises");
+	const composeFile = await readFile(
+		new URL("../../infra/the-keep/ci.compose.yml", import.meta.url),
+		"utf8",
+	);
+	const { environment } = await ensureEnvironment(PRODUCTION_PROJECT);
+	const name = "lyterion-ci";
+	let compose = environment.compose?.find((c) => c.name === name);
+	if (!compose) {
+		await dokploy("compose.create", {
+			name,
+			appName: name,
+			environmentId: environment.environmentId,
+			composeType: "docker-compose",
+			sourceType: "raw",
+			composeFile,
+		});
+		compose = (
+			await ensureEnvironment(PRODUCTION_PROJECT)
+		).environment.compose?.find((c) => c.name === name);
+	}
+	if (!compose) throw new Error("lyterion-ci compose was not created");
+	await dokploy("compose.update", {
+		composeId: compose.composeId,
+		sourceType: "raw",
+		composeFile,
+		composePath: "./docker-compose.yml",
+		env: envText({
+			RUNNER_TOKEN: process.env.RUNNER_TOKEN,
+			TURBO_TOKEN: requireEnv("TURBO_TOKEN"),
+			GARAGE_ACCESS_KEY: requireEnv("GARAGE_ACCESS_KEY"),
+			GARAGE_SECRET_KEY: requireEnv("GARAGE_SECRET_KEY"),
+		}),
+	});
+	await dokploy("compose.deploy", { composeId: compose.composeId });
+	const started = Date.now();
+	while (Date.now() - started < POLL_TIMEOUT_MS) {
+		await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+		const { composeStatus } = await query("compose.one", {
+			composeId: compose.composeId,
+		});
+		if (composeStatus === "done") return console.info("lyterion-ci deployed");
+		if (composeStatus === "error")
+			throw new Error("lyterion-ci deploy failed, check Dokploy logs");
+	}
+	throw new Error("lyterion-ci deploy timed out");
+}
+
 const MODES = {
 	"preview-up": previewUp,
 	"preview-down": previewDown,
 	production,
 	"comment-failed": commentFailed,
+	"ci-infra": ciInfra,
 };
 
 const run = MODES[MODE];

@@ -1,5 +1,5 @@
-# Dokploy compose service "lyterion-ci" on the-keep (D-036): GitHub runner + turbo remote cache.
-# Env (set in Dokploy, never committed): GITHUB_RUNNER_PAT, TURBO_TOKEN, GARAGE_ACCESS_KEY, GARAGE_SECRET_KEY, GARAGE_ENDPOINT=http://infrastructure-garage-lqdycf-garage-1:3900
+# Dokploy compose "lyterion-ci" on the-keep (D-036), deployed by .github/workflows/infra.yml.
+# Env comes from repo secrets through scripts/deploy/dokploy.mjs ci-infra, never committed.
 
 services:
   runner:
@@ -8,16 +8,19 @@ services:
     environment:
       REPO_URL: https://github.com/FindMalek/lyterion
       RUNNER_SCOPE: repo
-      ACCESS_TOKEN: ${GITHUB_RUNNER_PAT}
+      RUNNER_TOKEN: ${RUNNER_TOKEN}
       RUNNER_NAME: the-keep
       LABELS: the-keep
-      EPHEMERAL: "true"
+      EPHEMERAL: "false"
       DISABLE_AUTO_UPDATE: "true"
       RUNNER_WORKDIR: /tmp/runner/work
+      # Keeps the registration across restarts, so the 1h registration token is only needed once.
+      CONFIGURED_ACTIONS_RUNNER_FILES_DIR: /runner/data
     volumes:
       # Docker socket = root on the host, acceptable only because the repo is private (D-036).
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp/runner:/tmp/runner
+      - runner-data:/runner/data
     networks:
       - dokploy-network
 
@@ -30,13 +33,16 @@ services:
       STORAGE_PATH: turbo-cache
       S3_ACCESS_KEY: ${GARAGE_ACCESS_KEY}
       S3_SECRET_KEY: ${GARAGE_SECRET_KEY}
-      S3_ENDPOINT: ${GARAGE_ENDPOINT}
+      S3_ENDPOINT: http://infrastructure-garage-lqdycf-garage-1:3900
       S3_REGION: garage
       LOG_LEVEL: info
     networks:
       dokploy-network:
         aliases:
           - turbo-cache
+
+volumes:
+  runner-data:
 
 networks:
   dokploy-network:

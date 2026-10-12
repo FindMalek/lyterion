@@ -1,0 +1,30 @@
+# Deploys the CI infra compose (runner + turbo cache) to Dokploy from a GitHub hosted runner (D-036).
+# Run it manually after refreshing secrets.RUNNER_TOKEN (1h registration token), see docs/infra.md.
+
+name: Infra
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ci-infra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Deploy lyterion-ci compose
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_PUBLIC_URL || 'https://dokploy.findmalek.engineer' }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          RUNNER_TOKEN: ${{ secrets.RUNNER_TOKEN }}
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          GARAGE_ACCESS_KEY: ${{ secrets.GARAGE_ACCESS_KEY }}
+          GARAGE_SECRET_KEY: ${{ secrets.GARAGE_SECRET_KEY }}
+        run: node scripts/deploy/dokploy.mjs ci-infra
