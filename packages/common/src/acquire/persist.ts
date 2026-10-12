@@ -321,13 +321,26 @@ export async function recordOutcome(
 }
 
 /** Recordings the acquire stage should work on: resolved, plus earlier misses so new providers get a go. */
-export async function recordingsToAcquire(): Promise<
-	{ id: string; generation: number }[]
-> {
-	return db
-		.select({ id: recording.id, generation: recording.generation })
+export type AcquireTodo = {
+	id: string;
+	generation: number;
+	releaseId: string | null;
+};
+
+export async function recordingsToAcquire(): Promise<AcquireTodo[]> {
+	const rows = await db
+		.select({
+			id: recording.id,
+			generation: recording.generation,
+			placed: recording.placedReleaseIds,
+		})
 		.from(recording)
 		.where(inArray(recording.status, ["resolved", "missing"]));
+	return rows.map((r) => ({
+		id: r.id,
+		generation: r.generation,
+		releaseId: r.placed[0] ?? null,
+	}));
 }
 
 export function reviewDir(stagingDir: string, recordingId: string): string {

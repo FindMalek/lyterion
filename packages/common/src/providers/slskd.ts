@@ -17,7 +17,7 @@ import type {
 } from "./types";
 
 // slskd REST (/api/v0), docs/providers.md § slskd. Soulseek penalizes search floods, so searches are paced.
-const MIN_SEARCH_GAP_MS = 5_000;
+export const MIN_SEARCH_GAP_MS = 5_000;
 const SEARCH_TIMEOUT_MS = 15_000;
 const POLL_MS = 1_000;
 const DURATION_TOLERANCE_S = 3;
@@ -69,6 +69,8 @@ export type SlskdOptions = {
 	fetch?: typeof fetch;
 	sleep?: (ms: number) => Promise<void>;
 	now?: () => number;
+	// Cross-task pacing (#25); without it searches are paced only within this provider instance.
+	pace?: () => Promise<void>;
 };
 
 export type ReleaseTarget = {
@@ -205,9 +207,12 @@ export function createSlskdProvider(options: SlskdOptions): Provider & {
 	}
 
 	async function runSearch(searchText: string): Promise<SlskdResponse[]> {
-		const wait = lastSearchAt + MIN_SEARCH_GAP_MS - now();
-		if (wait > 0) await sleep(wait);
-		lastSearchAt = now();
+		if (options.pace) await options.pace();
+		else {
+			const wait = lastSearchAt + MIN_SEARCH_GAP_MS - now();
+			if (wait > 0) await sleep(wait);
+			lastSearchAt = now();
+		}
 		const id = randomUUID();
 		await api("/searches", {
 			method: "POST",

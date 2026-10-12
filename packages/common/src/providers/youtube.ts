@@ -42,6 +42,8 @@ export type YoutubeOptions = {
 	potProviderUrl?: string;
 	binary?: string;
 	run?: RunYtDlp;
+	// One yt-dlp call at a time across tasks, with jitter (docs/providers.md queue `youtube`).
+	pace?: () => Promise<void>;
 };
 
 const exec = promisify(execFile);
@@ -156,6 +158,7 @@ export function createYoutubeProvider(options: YoutubeOptions = {}): Provider {
 			const query = normalizeText(
 				`${target.artists[0] ?? ""} ${parseTitle(target.title).base}`,
 			);
+			await options.pace?.();
 			const stdout = await run([
 				"--flat-playlist",
 				"--dump-json",
@@ -175,6 +178,7 @@ export function createYoutubeProvider(options: YoutubeOptions = {}): Provider {
 		async fetch(candidate, stagingDir): Promise<FetchedFile> {
 			const dir = path.join(stagingDir, `yt-${randomUUID()}`);
 			await mkdir(dir, { recursive: true });
+			await options.pace?.();
 			// Opus stays opus (no re-encode); anything else is extracted as the best audio available.
 			await run([
 				"-f",

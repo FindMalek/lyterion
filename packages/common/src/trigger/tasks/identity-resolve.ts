@@ -2,6 +2,7 @@ import { env } from "@lyterion/env/server";
 import { idempotencyKeys, logger, task } from "@trigger.dev/sdk";
 
 import { recordingsToAcquire } from "../../acquire/persist";
+import { planAcquire } from "../../acquire/plan";
 import { getCredentials } from "../../credentials/store";
 import { runIdentityResolve } from "../../identity/persist";
 import { createNavidromeClient } from "../../navidrome/client";
@@ -10,6 +11,7 @@ import { finishRun } from "../../pipeline/advance";
 import { updateStageProgress } from "../../pipeline/progress";
 import { chunk } from "../utils/chunk";
 import { ACQUIRE_STAGE, acquireRecordingTask } from "./acquire-recording";
+import { acquireReleaseTask } from "./acquire-release";
 
 const BATCH = 500;
 
@@ -64,8 +66,28 @@ export const identityResolveTask = task({
 				await finishRun(runId, "done");
 				return { ...summary, acquire: 0 };
 			}
+			const plan = planAcquire(todo, !!(await getCredentials("slskd")));
+			for (const batch of chunk(plan.releases, BATCH)) {
+				await acquireReleaseTask.batchTrigger(
+					await Promise.all(
+						batch.map(async (r) => ({
+							payload: {
+								runId,
+								releaseId: r.releaseId,
+								recordingIds: r.recordings.map((x) => x.id),
+							},
+							options: {
+								idempotencyKey: await idempotencyKeys.create(
+									`release:${r.releaseId}:${runId}:${Math.max(...r.recordings.map((x) => x.generation))}`,
+									{ scope: "global" },
+								),
+							},
+						})),
+					),
+				);
+			}
 			// One attempt per recording per run; the generation lets the owner force a retry inside a run.
-			for (const batch of chunk(todo, BATCH)) {
+			for (const batch of chunk(plan.singles, BATCH)) {
 				await acquireRecordingTask.batchTrigger(
 					await Promise.all(
 						batch.map(async (r) => ({
@@ -80,7 +102,11 @@ export const identityResolveTask = task({
 					),
 				);
 			}
-			return { ...summary, acquire: todo.length };
+			return {
+				...summary,
+				acquire: todo.length,
+				albums: plan.releases.length,
+			};
 		} catch (err) {
 			await updateStageProgress(runId, STAGE, {
 				status: "failed",

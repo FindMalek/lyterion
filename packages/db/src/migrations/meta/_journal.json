@@ -71,6 +71,13 @@
 			"when": 1791822906384,
 			"tag": "0009_late_silver_sable",
 			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "7",
+			"when": 1791823699141,
+			"tag": "0010_classy_black_queen",
+			"breakpoints": true
 		}
 	]
 }

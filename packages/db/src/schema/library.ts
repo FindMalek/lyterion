@@ -228,3 +228,9 @@ export const providerHealth = pgTable(
 		index("provider_health_provider_idx").on(table.providerId, table.checkedAt),
 	],
 );
+
+// Next free start time per provider key, shared by every acquire task so pacing holds across workers (#25).
+export const providerSlot = pgTable("provider_slot", {
+	key: text("key").primaryKey(),
+	nextAt: timestamp("next_at").notNull(),
+});
