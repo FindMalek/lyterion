@@ -109,6 +109,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@lyterion/common':
+        specifier: workspace:*
+        version: link:../../packages/common
       '@lyterion/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -314,6 +317,9 @@ importers:
 
   packages/common:
     dependencies:
+      '@lyterion/core':
+        specifier: workspace:*
+        version: link:../core
       '@lyterion/db':
         specifier: workspace:*
         version: link:../db

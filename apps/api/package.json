@@ -8,13 +8,14 @@
 		"start": "node ../../scripts/with-root-env.mjs next start --port=3001"
 	},
 	"dependencies": {
-		"@orpc/openapi": "catalog:",
-		"@orpc/server": "catalog:",
-		"@orpc/zod": "catalog:",
+		"@lyterion/common": "workspace:*",
 		"@lyterion/core": "workspace:*",
 		"@lyterion/env": "workspace:*",
 		"@lyterion/logger": "workspace:*",
 		"@lyterion/orpc": "workspace:*",
+		"@orpc/openapi": "catalog:",
+		"@orpc/server": "catalog:",
+		"@orpc/zod": "catalog:",
 		"@trigger.dev/sdk": "catalog:",
 		"better-auth": "catalog:",
 		"dotenv": "catalog:",
