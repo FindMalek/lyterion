@@ -16,6 +16,7 @@ import {
 	scanState,
 	unlinkedFiles,
 } from "../../navidrome/persist";
+import { writeAllPlaylists } from "./playlists-write";
 import { starsSyncTask } from "./stars-sync";
 
 const POLL_SECONDS = 5;
@@ -56,15 +57,21 @@ export const navidromeScanTask = task({
 			unlinked: files.length - linked,
 		});
 		if (linked > 0) await starsSyncTask.trigger();
+		// Navidrome imports m3u files on scan, so changed playlists count as pending for the next one.
+		const playlists = await writeAllPlaylists();
+		if (playlists.changed > 0) await requestScan(playlists.changed);
 		return { scanned: state.pending, linked, unlinked: files.length - linked };
 	},
 });
 
 /** Call after each placed file: scan now at 200 pending, else once things go quiet for 10 minutes. */
-export async function requestScan(): Promise<void> {
-	const { pending } = await notePlaced();
-	// The counter moves atomically, so exactly one placement lands on each multiple of 200.
-	if (pending % SCAN_BATCH === 0) {
+export async function requestScan(count = 1): Promise<void> {
+	const { pending } = await notePlaced(count);
+	// The counter moves atomically, so exactly one caller crosses each multiple of 200.
+	if (
+		Math.floor(pending / SCAN_BATCH) >
+		Math.floor((pending - count) / SCAN_BATCH)
+	) {
 		await navidromeScanTask.trigger({});
 		return;
 	}
