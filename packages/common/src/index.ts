@@ -6,6 +6,7 @@ export * from "./library/layout";
 export * from "./library/place";
 export * from "./library/playlist";
 export * from "./library/tags";
+export * from "./notify/ntfy";
 export * from "./providers/rank";
 export * from "./providers/types";
 export { chunk } from "./trigger/utils/chunk";
