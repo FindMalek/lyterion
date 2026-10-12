@@ -1,0 +1,78 @@
+{
+	"$schema": "https://turbo.build/schema.json",
+	"ui": "tui",
+	"agentGuidance": false,
+	"globalEnv": [
+		"SKIP_ENV_VALIDATION",
+		"LYTERION_DATABASE_URL",
+		"NEXT_PUBLIC_LYTERION_NODE_ENV",
+		"NEXT_PUBLIC_LYTERION_API_URL",
+		"NEXT_PUBLIC_LYTERION_ALLOWED_ORIGIN",
+		"NEXT_PUBLIC_LYTERION_DASHBOARD_URL",
+		"LYTERION_BETTER_AUTH_SECRET",
+		"LYTERION_SPOTIFY_CLIENT_ID",
+		"LYTERION_SPOTIFY_CLIENT_SECRET",
+		"LYTERION_GROQ_API_KEY",
+		"LYTERION_TRIGGER_PROJECT_REF",
+		"LYTERION_TRIGGER_SECRET_KEY",
+		"LYTERION_TRIGGER_API_URL"
+	],
+	"globalPassThroughEnv": [
+		"SKIP_ENV_VALIDATION",
+		"LYTERION_DATABASE_URL",
+		"NEXT_PUBLIC_LYTERION_NODE_ENV",
+		"NEXT_PUBLIC_LYTERION_API_URL",
+		"NEXT_PUBLIC_LYTERION_ALLOWED_ORIGIN",
+		"NEXT_PUBLIC_LYTERION_DASHBOARD_URL",
+		"LYTERION_BETTER_AUTH_SECRET",
+		"LYTERION_SPOTIFY_CLIENT_ID",
+		"LYTERION_SPOTIFY_CLIENT_SECRET",
+		"LYTERION_GROQ_API_KEY",
+		"LYTERION_TRIGGER_PROJECT_REF",
+		"LYTERION_TRIGGER_SECRET_KEY",
+		"LYTERION_TRIGGER_API_URL",
+		"TRIGGER_SECRET_KEY",
+		"TRIGGER_PROJECT_REF",
+		"TRIGGER_API_URL",
+		"TRIGGER_ACCESS_TOKEN",
+		"LYTERION_TRIGGER_ACCESS_TOKEN",
+		"LYTERION_TRIGGER_DEV_SKIP"
+	],
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["dist/**", ".next/**"]
+		},
+		"lint": {
+			"dependsOn": ["^lint"]
+		},
+		"check-types": {
+			"dependsOn": ["^check-types"]
+		},
+		"test": {
+			"dependsOn": ["^test"]
+		},
+		"dev": {
+			"cache": false,
+			"persistent": true
+		},
+		"db:push": {
+			"cache": false
+		},
+		"db:generate": {
+			"cache": false
+		},
+		"db:migrate": {
+			"cache": false,
+			"persistent": true
+		},
+		"db:studio": {
+			"cache": false,
+			"persistent": true
+		},
+		"db:reset": {
+			"cache": false
+		}
+	}
+}

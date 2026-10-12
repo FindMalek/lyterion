@@ -1,0 +1,30 @@
+{
+	"name": "@lyterion/env",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "tsc --noEmit"
+	},
+	"exports": {
+		".": "./src/index.ts",
+		"./server": "./src/server.ts",
+		"./dashboard": "./src/dashboard.ts",
+		"./base": "./src/base.ts",
+		"./presets": "./src/presets/index.ts",
+		"./presets/api": "./src/presets/api.ts",
+		"./presets/dashboard": "./src/presets/dashboard.ts",
+		"./presets/db": "./src/presets/db.ts"
+	},
+	"dependencies": {
+		"@t3-oss/env-core": "catalog:",
+		"@t3-oss/env-nextjs": "catalog:",
+		"dotenv": "catalog:",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@lyterion/config": "workspace:*",
+		"@types/node": "^26.5.1",
+		"typescript": "catalog:"
+	}
+}
