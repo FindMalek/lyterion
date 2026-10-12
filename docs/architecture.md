@@ -59,7 +59,8 @@ Built through Trigger.dev build extensions:
 - `ffmpeg` (decode check, transcode/downsample, spectral data)
 - `chromaprint` (`fpcalc`)
 - `sox` (spectrogram and cutoff analysis, resampling)
-- Python plus `streamrip`, `yt-dlp`, `mutagen`, `rsgain` (ReplayGain)
+- Python plus `streamrip`, `yt-dlp`, `mutagen`, `rsgain` (ReplayGain), and
+  `packages/common/python/` copied in (tag writer)
 - `aria2c` or libtorrent (selective torrent fetch, Anna)
 
 ## Monorepo (D-004)
