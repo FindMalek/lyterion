@@ -22,6 +22,10 @@
 **Unverified:** reports conflict on whether the Feb 2026 dev-mode removals
 (batch `/tracks`, `/albums`, `/artists`, other users' playlists) apply to
 existing apps. Spike S2 settles it before any code depends on it.
+Run it from Connections → Spotify endpoint audit (#8): it calls each
+endpoint above plus `/tracks/{id}`, `/tracks?ids=`, `/albums/{id}` and
+`/albums?ids=` once with the owner's app, and shows the status and whether
+ISRC/UPC came back. Owned and followed playlists are tried separately.
 
 ## ISRC for saved-album tracks
 

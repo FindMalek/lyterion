@@ -1,12 +1,9 @@
-import { database, getAuth } from "@lyterion/core";
-import { account, user } from "@lyterion/db/schema/auth";
 import { logger, task } from "@trigger.dev/sdk";
-import { and, eq } from "drizzle-orm";
 
 import { claimStage, finishRun } from "../../pipeline/advance";
 import { updateStageProgress } from "../../pipeline/progress";
-import { createSpotifyClient } from "../../spotify/client";
 import { exportLibrary } from "../../spotify/export";
+import { ownerSpotifyAccount, ownerSpotifyClient } from "../../spotify/owner";
 import { persistExport, saveExportPage } from "../../spotify/persist";
 import {
 	type ExportMode,
@@ -16,40 +13,6 @@ import {
 import { identityResolveTask } from "./identity-resolve";
 
 const STAGE = "spotify.export";
-
-export async function ownerSpotifyAccount(): Promise<{
-	userId: string;
-	accountId: string;
-}> {
-	const [owner] = await database
-		.select({ userId: user.id, accountId: account.id })
-		.from(user)
-		.innerJoin(
-			account,
-			and(eq(account.userId, user.id), eq(account.providerId, "spotify")),
-		)
-		.limit(1);
-	if (!owner)
-		throw new Error(
-			"no owner with a linked Spotify account yet, sign in with Spotify first",
-		);
-	return owner;
-}
-
-export function ownerSpotifyClient(selection: {
-	userId: string;
-	accountId: string;
-}) {
-	return createSpotifyClient(async (forceRefresh) => {
-		const auth = await getAuth();
-		const result = forceRefresh
-			? await auth.api.refreshToken({ body: selection })
-			: await auth.api.getAccessToken({ body: selection });
-		if (!result.accessToken)
-			throw new Error("spotify token unavailable, reconnect Spotify");
-		return result.accessToken;
-	});
-}
 
 export const spotifyExportTask = task({
 	id: STAGE,

@@ -14,8 +14,8 @@ import {
 	type RawTrack,
 	trackRow,
 } from "../../spotify/export";
+import { ownerSpotifyAccount, ownerSpotifyClient } from "../../spotify/owner";
 import { persistExport } from "../../spotify/persist";
-import { ownerSpotifyAccount, ownerSpotifyClient } from "./spotify-export";
 
 function slug(name: string) {
 	return (
