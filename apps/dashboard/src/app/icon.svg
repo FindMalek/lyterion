@@ -1,15 +1,7 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <!-- Bar geometry mirrors Logo in packages/ui/src/components/shared/logo.tsx (`Icons.logo`) — keep in sync -->
-  <title>Lyterion Dashboard</title>
-  <style>
-    .bar { fill: #2e9a3a; }
-    @media (prefers-color-scheme: dark) { .bar { fill: #5ecf5e; } }
-  </style>
-  <g class="bar">
-  <rect x="20" y="58" width="9" height="15" rx="4.5"/>
-  <rect x="33" y="44" width="9" height="29" rx="4.5"/>
-  <rect x="46" y="30" width="9" height="43" rx="4.5"/>
-  <rect x="59" y="49" width="9" height="24" rx="4.5" opacity="0.55"/>
-  <rect x="72" y="38" width="9" height="35" rx="4.5" opacity="0.8"/>
-</g>
+<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+  <!-- Glyph mirrors Logo in packages/ui/src/components/shared/logo.tsx, keep in sync -->
+  <title>Lyterion</title>
+  <rect width="16" height="16" fill="#101010"/>
+  <path d="M4 6h1.5v4.5H10V12H4z" fill="#ebebeb"/>
+  <rect x="8" y="4" width="4" height="4" fill="#ebebeb"/>
 </svg>
