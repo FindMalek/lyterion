@@ -1,0 +1,361 @@
+# Dokploy compose "lyterion-trigger" on the-keep (#4, D-003): Trigger.dev v4 webapp and supervisor in one stack.
+# Adapted from triggerdotdev/trigger.dev hosting/docker at v4.7.3: Garage instead of MinIO, GHCR instead of a local registry.
+# Deployed by .github/workflows/infra.yml (dokploy.mjs trigger-infra); secrets live in the Dokploy compose env.
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 20m
+    max-file: "5"
+
+services:
+  webapp:
+    image: ghcr.io/triggerdotdev/trigger.dev:${TRIGGER_IMAGE_TAG:-v4.7.3}
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      - postgres
+      - redis
+      - clickhouse
+      - s2
+    networks:
+      trigger-webapp:
+      trigger-supervisor:
+      dokploy-network:
+        aliases:
+          - trigger-webapp
+    volumes:
+      - shared:/home/node/shared
+    # Bootstrap writes the worker token into the shared volume, which needs root once.
+    user: root
+    command: sh -c "chown -R node:node /home/node/shared && exec ./scripts/entrypoint.sh"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "http.get('http://localhost:3000/healthcheck', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    environment:
+      APP_ORIGIN: ${TRIGGER_ORIGIN}
+      LOGIN_ORIGIN: ${TRIGGER_ORIGIN}
+      API_ORIGIN: ${TRIGGER_ORIGIN}
+      DEV_OTEL_EXPORTER_OTLP_ENDPOINT: ${TRIGGER_ORIGIN}/otel
+      ELECTRIC_ORIGIN: http://electric:3000
+      REALTIME_STREAMS_DEFAULT_VERSION: v2
+      REALTIME_STREAMS_S2_BASIN: trigger-realtime
+      REALTIME_STREAMS_S2_ENDPOINT: http://s2/v1
+      REALTIME_STREAMS_S2_SKIP_ACCESS_TOKENS: "true"
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/main?schema=public&sslmode=disable
+      DIRECT_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/main?schema=public&sslmode=disable
+      SESSION_SECRET: ${SESSION_SECRET}
+      MAGIC_LINK_SECRET: ${MAGIC_LINK_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      PROVIDER_SECRET: ${PROVIDER_SECRET}
+      COORDINATOR_SECRET: ${COORDINATOR_SECRET}
+      MANAGED_WORKER_SECRET: ${MANAGED_WORKER_SECRET}
+      # Single owner (D-001): only this address can log in. No mail transport, so the magic link is printed in the webapp log.
+      WHITELISTED_EMAILS: ${TRIGGER_WHITELISTED_EMAILS}
+      ADMIN_EMAILS: ${TRIGGER_WHITELISTED_EMAILS}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_TLS_DISABLED: "true"
+      APP_LOG_LEVEL: info
+      # Deploy images live on GHCR: CI pushes with its GITHUB_TOKEN, the supervisor pulls with a read token.
+      DEPLOY_REGISTRY_HOST: ghcr.io
+      DEPLOY_REGISTRY_NAMESPACE: ${GHCR_NAMESPACE:-findmalek}
+      OBJECT_STORE_BASE_URL: ${GARAGE_ENDPOINT:-http://infrastructure-garage-lqdycf-garage-1:3900}
+      OBJECT_STORE_BUCKET: ${TRIGGER_BUCKET:-trigger-packets}
+      OBJECT_STORE_REGION: garage
+      OBJECT_STORE_ACCESS_KEY_ID: ${TRIGGER_GARAGE_ACCESS_KEY}
+      OBJECT_STORE_SECRET_ACCESS_KEY: ${TRIGGER_GARAGE_SECRET_KEY}
+      GRACEFUL_SHUTDOWN_TIMEOUT: 1000
+      TRIGGER_BOOTSTRAP_ENABLED: 1
+      TRIGGER_BOOTSTRAP_WORKER_GROUP_NAME: the-keep
+      TRIGGER_BOOTSTRAP_WORKER_TOKEN_PATH: /home/node/shared/worker_token
+      CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD}@clickhouse:8123?secure=false
+      CLICKHOUSE_LOG_LEVEL: info
+      RUN_REPLICATION_ENABLED: 1
+      RUN_REPLICATION_CLICKHOUSE_URL: http://default:${CLICKHOUSE_PASSWORD}@clickhouse:8123
+      RUN_REPLICATION_LOG_LEVEL: info
+      INTERNAL_OTEL_TRACE_LOGGING_ENABLED: 0
+
+  postgres:
+    image: postgres:14
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - postgres:/var/lib/postgresql/data/
+    networks:
+      - trigger-webapp
+    command: ["-c", "wal_level=logical"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7.4
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - redis:/data
+    networks:
+      - trigger-webapp
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  electric:
+    image: electricsql/electric:1.2.4
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      - postgres
+    networks:
+      - trigger-webapp
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/main?schema=public&sslmode=disable
+      ELECTRIC_INSECURE: "true"
+      ELECTRIC_USAGE_REPORTING: "false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.2
+    restart: unless-stopped
+    logging: *logging
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+    # Raw compose in Dokploy has no repo checkout, so upstream's config files are inlined.
+    configs:
+      - source: clickhouse-data-paths
+        target: /etc/clickhouse-server/config.d/data-paths.xml
+      - source: clickhouse-override
+        target: /etc/clickhouse-server/config.d/override.xml
+      - source: clickhouse-users-override
+        target: /etc/clickhouse-server/users.d/override.xml
+    networks:
+      - trigger-webapp
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "clickhouse-client",
+          "--host",
+          "localhost",
+          "--port",
+          "9000",
+          "--user",
+          "default",
+          "--password",
+          "${CLICKHOUSE_PASSWORD}",
+          "--query",
+          "SELECT 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  s2-init:
+    image: busybox:1.37
+    restart: "no"
+    logging: *logging
+    command:
+      - sh
+      - -c
+      - |
+        cat > /config/s2-spec.json <<JSON
+        {"basins": [{"name": "trigger-realtime", "config": {"create_stream_on_append": true, "create_stream_on_read": true}}]}
+        JSON
+    volumes:
+      - s2-config:/config
+    networks:
+      - trigger-webapp
+
+  s2:
+    image: ghcr.io/s2-streamstore/s2:latest@sha256:d6ded5ca7dd619fa7c946f06e39a98f9c95c6883c8bb884e5eaa129f232c920c
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      s2-init:
+        condition: service_completed_successfully
+    command: ["lite", "--init-file", "/config/s2-spec.json", "--local-root", "/data"]
+    user: "0:0"
+    volumes:
+      - s2-config:/config
+      - s2:/data
+    networks:
+      - trigger-webapp
+
+  supervisor:
+    # Upstream plus DOCKER_RUNNER_BINDS (infra/the-keep/supervisor, D-042); built by .github/workflows/supervisor-image.yml.
+    image: ghcr.io/findmalek/lyterion-supervisor:${TRIGGER_IMAGE_TAG:-v4.7.3}
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      - docker-proxy
+      - webapp
+    networks:
+      - trigger-supervisor
+      - trigger-docker-proxy
+      - trigger-webapp
+    volumes:
+      - shared:/home/node/shared
+    user: root
+    command: sh -c "chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start"
+    environment:
+      TRIGGER_WORKER_TOKEN: file:///home/node/shared/worker_token
+      MANAGED_WORKER_SECRET: ${MANAGED_WORKER_SECRET}
+      TRIGGER_API_URL: http://webapp:3000
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://webapp:3000/otel
+      TRIGGER_WORKLOAD_API_DOMAIN: supervisor
+      TRIGGER_WORKLOAD_API_PORT_EXTERNAL: 8020
+      ENFORCE_MACHINE_PRESETS: 1
+      TRIGGER_DEQUEUE_INTERVAL_MS: 1000
+      DOCKER_HOST: tcp://docker-proxy:2375
+      # Runs also join dokploy-network so tasks reach lyterion-db, slskd, Navidrome and ntfy by service name.
+      DOCKER_RUNNER_NETWORKS: trigger-webapp,trigger-supervisor,dokploy-network
+      # Host folders every run sees at the paths the LYTERION_* defaults expect (#5).
+      DOCKER_RUNNER_BINDS: ${TRIGGER_RUNNER_BINDS:-/srv/music:/music,/srv/lyterion/staging:/staging,/srv/lyterion/slskd-downloads:/slskd/downloads}
+      DOCKER_REGISTRY_URL: ghcr.io
+      DOCKER_REGISTRY_USERNAME: ${GHCR_USERNAME}
+      DOCKER_REGISTRY_PASSWORD: ${GHCR_READ_TOKEN}
+      # Exited run containers pile up on a small Docker disk (D-037), so they are removed.
+      DOCKER_AUTOREMOVE_EXITED_CONTAINERS: 1
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "http.get('http://localhost:8020/health', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.3.0
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - trigger-docker-proxy
+    environment:
+      LOG_LEVEL: info
+      POST: 1
+      CONTAINERS: 1
+      IMAGES: 1
+      INFO: 1
+      NETWORKS: 1
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "2375"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+configs:
+  clickhouse-data-paths:
+    content: |
+      <clickhouse>
+          <path>/var/lib/clickhouse/data/</path>
+          <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
+          <user_files_path>/var/lib/clickhouse/data/user_files/</user_files_path>
+          <format_schema_path>/var/lib/clickhouse/data/format_schemas/</format_schema_path>
+          <user_directories>
+              <local_directory>
+                  <path>/var/lib/clickhouse/data/access/</path>
+              </local_directory>
+          </user_directories>
+      </clickhouse>
+  clickhouse-override:
+    content: |
+      <clickhouse>
+          <logger><level>warning</level></logger>
+          <mark_cache_size>524288000</mark_cache_size>
+          <concurrent_threads_soft_limit_num>1</concurrent_threads_soft_limit_num>
+          <metric_log remove="1"/>
+          <asynchronous_metric_log remove="1"/>
+          <trace_log remove="1"/>
+          <query_thread_log remove="1"/>
+          <session_log remove="1"/>
+          <text_log remove="1"/>
+          <zookeeper_log remove="1"/>
+          <processors_profile_log remove="1"/>
+          <asynchronous_insert_log remove="1"/>
+          <backup_log remove="1"/>
+          <latency_log remove="1"/>
+          <query_metric_log remove="1"/>
+          <opentelemetry_span_log remove="1"/>
+          <query_views_log remove="1"/>
+          <part_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></part_log>
+          <query_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></query_log>
+          <error_log><ttl>event_date + INTERVAL 30 DAY DELETE</ttl></error_log>
+      </clickhouse>
+  clickhouse-users-override:
+    content: |
+      <clickhouse>
+          <profiles>
+              <default>
+                  <max_threads>1</max_threads>
+                  <max_block_size>8192</max_block_size>
+                  <max_download_threads>1</max_download_threads>
+                  <input_format_parallel_parsing>0</input_format_parallel_parsing>
+                  <output_format_parallel_formatting>0</output_format_parallel_formatting>
+                  <memory_profiler_step>0</memory_profiler_step>
+                  <memory_profiler_sample_probability>0</memory_profiler_sample_probability>
+                  <query_profiler_real_time_period_ns>0</query_profiler_real_time_period_ns>
+                  <query_profiler_cpu_time_period_ns>0</query_profiler_cpu_time_period_ns>
+              </default>
+          </profiles>
+      </clickhouse>
+
+volumes:
+  clickhouse:
+  postgres:
+  redis:
+  shared:
+  s2:
+  s2-config:
+
+# Fixed names: the supervisor attaches run containers to these by name.
+networks:
+  trigger-webapp:
+    name: trigger-webapp
+  trigger-supervisor:
+    name: trigger-supervisor
+  trigger-docker-proxy:
+    name: trigger-docker-proxy
+  dokploy-network:
+    external: true

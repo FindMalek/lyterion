@@ -93,6 +93,8 @@ jobs:
             LYTERION_GROQ_API_KEY=${{ secrets.LYTERION_GROQ_API_KEY }}
             LYTERION_ACOUSTID_API_KEY=${{ secrets.LYTERION_ACOUSTID_API_KEY }}
             LYTERION_NTFY_URL=${{ vars.LYTERION_NTFY_URL }}
+            LYTERION_TRIGGER_API_URL=${{ vars.LYTERION_TRIGGER_API_URL }}
+            LYTERION_TRIGGER_SECRET_KEY=${{ secrets.LYTERION_TRIGGER_SECRET_KEY }}
           PRODUCTION_DASHBOARD_HOST: ${{ vars.PRODUCTION_DASHBOARD_HOST }}
           PRODUCTION_API_HOST: ${{ vars.PRODUCTION_API_HOST }}
           PRODUCTION_POSTGRES_ID: ${{ vars.PRODUCTION_POSTGRES_ID }}
@@ -101,6 +103,15 @@ jobs:
       - name: Setup pnpm
         if: vars.LYTERION_TRIGGER_API_URL != ''
         uses: pnpm/action-setup@v4
+
+      # Self-hosted deploys build on this runner and push to the registry the webapp names (ghcr.io, #4).
+      - name: Log in to GHCR for the task image
+        if: vars.LYTERION_TRIGGER_API_URL != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: Deploy Trigger.dev tasks
         if: vars.LYTERION_TRIGGER_API_URL != ''

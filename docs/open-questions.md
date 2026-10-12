@@ -22,3 +22,16 @@ Q18 ntfy on `the-keep` (D-034), Q19 both signals (D-032).
 | S5 | Jev API access, request/response shape, limits | M7 | waitlist, then a 1-day wrapper behind `getAIModel` |
 | S6 | Navidrome m3u import: visibility to non-admin users, sync-on-change behavior, sidecar cover pickup on 0.61 | M5 | write a test m3u + jpg into a scratch library |
 | S7 | AcoustID coverage on a sample of the owner's library (what % of tracks return a recording) | M3 verification thresholds | fingerprint 200 random files from slskd |
+
+## Spike answers
+
+- **S1** no, not out of the box; solved with a patched supervisor (D-042, D-043).
+- **S4** no. Trigger.dev's self-hosting overview at `v4.7.3` lists
+  checkpoints as cloud only, and the supervisor only restores through a
+  `TRIGGER_CHECKPOINT_URL` service that isn't shipped. A `wait.*` or
+  `triggerAndWait` would keep its run container alive and hold a concurrency
+  slot for the whole wait. Lyterion has none: stages advance by counters
+  (D-014), and the one pause (acquire over its disk budget) re-triggers
+  itself with a delay instead of waiting.
+- **S6** checked on 0.64.2 (D-041): import, order and sidecar cover work;
+  imported playlists are owned by the first admin.

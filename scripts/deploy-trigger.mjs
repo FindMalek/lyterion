@@ -42,8 +42,11 @@ if (!env.TRIGGER_ACCESS_TOKEN) {
 	process.exit(1);
 }
 
+// Same version as the self-hosted webapp and supervisor (infra/the-keep/trigger.compose.yml).
+const CLI_VERSION = "4.7.3";
+
 const args = [
-	"trigger.dev@latest",
+	`trigger.dev@${CLI_VERSION}`,
 	"deploy",
 	"--config",
 	"apps/api/trigger.config.ts",
