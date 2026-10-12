@@ -79,5 +79,13 @@ describe("writePlaylist", () => {
 		const second = await writePlaylist(spec, root);
 		expect(second.changed).toBe(false);
 		expect(statSync(first.path).mtimeMs).toBe(mtime);
+
+		writeFileSync(cover, "new jpg");
+		const third = await writePlaylist(spec, root);
+		expect(third.changed).toBe(true);
+		expect(statSync(first.path).mtimeMs).toBe(mtime);
+		expect(
+			readFileSync(join(root, "Playlists/Late night _ drive.jpg"), "utf8"),
+		).toBe("new jpg");
 	});
 });

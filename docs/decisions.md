@@ -440,3 +440,23 @@ Better Auth is built lazily (`getAuth()` in `@lyterion/core`) and rebuilt
 when the Spotify app changes: at once in the api, within 30s in the
 Trigger.dev worker. `LYTERION_SPOTIFY_CLIENT_ID` / `_SECRET` are optional
 now and only a fallback.
+
+## D-041 Navidrome 0.64.2 checks, against the real binary (2026-10-12, answers the open checks in D-023, D-026, #30, #44)
+
+Run against the `v0.64.2` linux release with a scratch library, the D-016
+cover priority, and the files Lyterion writes:
+
+- **m3u8 import:** `Playlists/Night Drive.m3u8` with `../Artist/Album/NN
+  Title.ext` paths imports as a read-only playlist owned by the first admin,
+  in file order. It needs an admin to exist: a scan before the first admin
+  logs "Playlists will not be imported" and imports on the next scan.
+- **Sidecar cover:** `Night Drive.jpg` next to the m3u8 becomes the playlist
+  cover (`getCoverArt pl-…` returns that image, not a mosaic).
+- **Smart playlist:** `{"all":[{"is":{"rating":1}}]}` is the right field.
+  `setRating 1` puts the song in `Upgrade queue` at once.
+- **Swap keeps identity:** replacing `01 Angel.flac` with `01 Angel.mp3`
+  tagged by `write_tags.py` keeps the song ID, the 1-star rating, the star and
+  the play count, both with `MUSICBRAINZ_TRACKID` and without it. The
+  scanner logs "Found moved files" and repoints playlist entries itself.
+  Lyterion still rewrites its m3u8 files, because the file on disk would
+  otherwise keep the old extension.

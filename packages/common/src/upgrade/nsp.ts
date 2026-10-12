@@ -1,4 +1,4 @@
-// D-026: Navidrome keeps this smart playlist current, Lyterion only reads it; "rating" field unverified on 0.64 (#44).
+// D-026: Navidrome keeps this smart playlist current, Lyterion only reads it; the "rating" rule is checked on 0.64.2 (D-041).
 export const UPGRADE_QUEUE_NAME = "Upgrade queue";
 export const UPGRADE_PLAYLIST_NAME = "⇪ Upgrade";
 
