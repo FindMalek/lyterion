@@ -16,6 +16,7 @@ import {
 	scanState,
 	unlinkedFiles,
 } from "../../navidrome/persist";
+import { starsSyncTask } from "./stars-sync";
 
 const POLL_SECONDS = 5;
 const MAX_POLLS = 720;
@@ -54,6 +55,7 @@ export const navidromeScanTask = task({
 			linked,
 			unlinked: files.length - linked,
 		});
+		if (linked > 0) await starsSyncTask.trigger();
 		return { scanned: state.pending, linked, unlinked: files.length - linked };
 	},
 });

@@ -10,6 +10,8 @@ export type SubsonicSong = {
 	title: string;
 	artist?: string;
 	album?: string;
+	albumId?: string;
+	artistId?: string;
 	duration?: number;
 	starred?: string;
 };
@@ -87,6 +89,31 @@ export function createNavidromeClient(
 				songs.push(...page);
 				if (page.length < PAGE) return songs;
 			}
+		},
+		async starred(): Promise<{
+			songs: string[];
+			albums: string[];
+			artists: string[];
+		}> {
+			const reply = await call<{
+				starred2?: {
+					song?: { id: string }[];
+					album?: { id: string }[];
+					artist?: { id: string }[];
+				};
+			}>("getStarred2");
+			const s = reply.starred2 ?? {};
+			return {
+				songs: (s.song ?? []).map((x) => x.id),
+				albums: (s.album ?? []).map((x) => x.id),
+				artists: (s.artist ?? []).map((x) => x.id),
+			};
+		},
+		async artists(): Promise<{ id: string; name: string }[]> {
+			const reply = await call<{
+				artists?: { index?: { artist?: { id: string; name: string }[] }[] };
+			}>("getArtists");
+			return (reply.artists?.index ?? []).flatMap((i) => i.artist ?? []);
 		},
 		async star(ids: {
 			id?: string[];

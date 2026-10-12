@@ -86,3 +86,36 @@ describe("createNavidromeClient", () => {
 		);
 	});
 });
+
+import { planStars } from "../stars";
+
+describe("planStars", () => {
+	const ids = (
+		songs: string[] = [],
+		albums: string[] = [],
+		artists: string[] = [],
+	) => ({
+		songs: new Set(songs),
+		albums: new Set(albums),
+		artists: new Set(artists),
+	});
+
+	it("stars what is missing, unstars only Spotify removals, keeps the owner's own stars", () => {
+		const plan = planStars({
+			wanted: ids(["s1", "s2"], ["a1"], ["ar1"]),
+			removed: ids(["s3", "s4"]),
+			starred: ids(["s1", "s3", "own"], [], ["ar1"]),
+		});
+		expect(plan.star).toEqual({ id: ["s2"], albumId: ["a1"], artistId: [] });
+		expect(plan.unstar).toEqual({ id: ["s3"], albumId: [], artistId: [] });
+	});
+
+	it("never unstars something that is wanted again", () => {
+		const plan = planStars({
+			wanted: ids(["s1"]),
+			removed: ids(["s1"]),
+			starred: ids(["s1"]),
+		});
+		expect(plan.unstar.id).toEqual([]);
+	});
+});
