@@ -99,13 +99,21 @@ export async function checkConnections(
 						const body = (await res.json()) as {
 							"subsonic-response"?: {
 								status?: string;
+								type?: string;
+								version?: string;
+								serverVersion?: string;
 								error?: { message?: string };
 							};
 						};
 						const reply = body["subsonic-response"];
+						const version = reply?.serverVersion ?? reply?.version;
 						return {
 							ok: reply?.status === "ok",
-							detail: reply?.error?.message,
+							detail:
+								reply?.error?.message ??
+								(version
+									? `${reply?.type ?? "subsonic"} ${version}`
+									: undefined),
 						};
 					}
 				: null,
@@ -152,7 +160,22 @@ export async function checkConnections(
 		["deezer", "Deezer ARL", !!env.deezerArl, null],
 		["youtube", "YouTube Music", !!env.ytdlpCookiesPath, null],
 		["acoustid", "AcoustID", !!env.acoustidKey, null],
-		["groq", "Groq", !!env.groqKey, null],
+		[
+			"groq",
+			"Groq",
+			!!env.groqKey,
+			env.groqKey
+				? async () => {
+						const res = await get("https://api.groq.com/openai/v1/models", {
+							Authorization: `Bearer ${env.groqKey}`,
+						});
+						return {
+							ok: res.ok,
+							detail: res.ok ? undefined : `HTTP ${res.status}`,
+						};
+					}
+				: null,
+		],
 		["jev", "Jev", !!env.jevKey, null],
 		[
 			"ntfy",

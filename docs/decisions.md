@@ -410,3 +410,16 @@ can't reach `api.lyterion.findmalek.engineer`: its session check failed and
 every sign-in bounced back to `/login`. Server-side calls now use
 `LYTERION_API_INTERNAL_URL` (`http://<api appName>:3001`), set by
 `scripts/deploy/dokploy.mjs`. The browser keeps using the public url.
+
+## D-039 Service credentials are entered in the dashboard (2026-10-12, amends D-013, #83)
+
+Navidrome, slskd, proxy backends, Deezer ARL, AcoustID, Groq, Jev and ntfy are
+set from Connections, tested live, and stored in `integration_credential` as
+AES-256-GCM ciphertext. The key is `LYTERION_ENCRYPTION_KEY`, or one derived
+from `LYTERION_BETTER_AUTH_SECRET` when unset. Every reader goes through
+`getCredentials(kind)` (`@lyterion/common/credentials`): the dashboard value,
+else the `LYTERION_*` env var, so env-only setups keep working. Secrets never
+go back to the browser; a blank secret field keeps the saved one. The
+Trigger.dev worker needs the same secret to decrypt. Still env-only: the
+Spotify app (Better Auth reads it at boot), Trigger.dev and yt-dlp cookies.
+

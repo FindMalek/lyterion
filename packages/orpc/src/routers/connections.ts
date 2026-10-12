@@ -1,47 +1,94 @@
 import { checkConnections } from "@lyterion/common";
+import {
+	CREDENTIAL_KINDS,
+	type CredentialKind,
+	clearCredentials,
+	describeCredentials,
+	mergeCredentials,
+	rawCredentials,
+	resolveConnectionsEnv,
+	saveCredentials,
+	validateCredentials,
+} from "@lyterion/common/credentials";
 import { database } from "@lyterion/core";
 import { account } from "@lyterion/db/schema/auth";
-import { env } from "@lyterion/env/server";
+import { ORPCError } from "@orpc/server";
 import { and, eq } from "drizzle-orm";
+import { z } from "zod";
 
 import { protectedProcedure } from "../procedures";
 
+const kindInput = z.enum(
+	Object.keys(CREDENTIAL_KINDS) as [CredentialKind, ...CredentialKind[]],
+);
+const valuesInput = z.object({
+	kind: kindInput,
+	values: z.record(z.string(), z.string().max(4096)),
+});
+
+async function spotifyLinked(userId: string) {
+	const [row] = await database
+		.select({ id: account.id })
+		.from(account)
+		.where(and(eq(account.userId, userId), eq(account.providerId, "spotify")))
+		.limit(1);
+	return !!row;
+}
+
+// Merge with what's saved (blank secret = keep) and refuse anything the schema rejects.
+async function prepare(kind: CredentialKind, values: Record<string, string>) {
+	const { raw: current } = await rawCredentials(kind);
+	const merged = mergeCredentials(kind, current, values);
+	const valid = validateCredentials(kind, merged);
+	if (!valid.ok) throw new ORPCError("BAD_REQUEST", { message: valid.error });
+	return merged;
+}
+
+async function probe(
+	userId: string,
+	kind: CredentialKind,
+	raw?: Record<string, string>,
+) {
+	const rows = await checkConnections(
+		await resolveConnectionsEnv(
+			await spotifyLinked(userId),
+			raw ? { kind, raw } : undefined,
+		),
+	);
+	const row = rows.find((r) => r.id === kind);
+	if (!row) throw new ORPCError("NOT_FOUND", { message: kind });
+	return row;
+}
+
 export const connectionsRouter = {
-	list: protectedProcedure.handler(async ({ context }) => {
-		const [spotify] = await database
-			.select({ id: account.id })
-			.from(account)
-			.where(
-				and(
-					eq(account.userId, context.session.user.id),
-					eq(account.providerId, "spotify"),
-				),
-			)
-			.limit(1);
-		return checkConnections({
-			spotifyLinked: !!spotify,
-			navidrome:
-				env.LYTERION_NAVIDROME_URL &&
-				env.LYTERION_NAVIDROME_USER &&
-				env.LYTERION_NAVIDROME_PASSWORD
-					? {
-							url: env.LYTERION_NAVIDROME_URL,
-							user: env.LYTERION_NAVIDROME_USER,
-							password: env.LYTERION_NAVIDROME_PASSWORD,
-						}
-					: undefined,
-			slskd:
-				env.LYTERION_SLSKD_URL && env.LYTERION_SLSKD_API_KEY
-					? { url: env.LYTERION_SLSKD_URL, apiKey: env.LYTERION_SLSKD_API_KEY }
-					: undefined,
-			proxyBackends: env.LYTERION_PROXY_BACKENDS,
-			deezerArl: env.LYTERION_DEEZER_ARL,
-			ytdlpCookiesPath: env.LYTERION_YTDLP_COOKIES_PATH,
-			acoustidKey: env.LYTERION_ACOUSTID_API_KEY,
-			groqKey: env.LYTERION_GROQ_API_KEY,
-			jevKey: env.LYTERION_JEV_API_KEY,
-			ntfyUrl: env.LYTERION_NTFY_URL,
-			triggerApiUrl: env.LYTERION_TRIGGER_API_URL,
-		});
-	}),
+	list: protectedProcedure.handler(async ({ context }) =>
+		checkConnections(
+			await resolveConnectionsEnv(await spotifyLinked(context.session.user.id)),
+		),
+	),
+	forms: protectedProcedure.handler(() => describeCredentials()),
+	test: protectedProcedure
+		.input(valuesInput)
+		.handler(async ({ input, context }) =>
+			probe(
+				context.session.user.id,
+				input.kind,
+				await prepare(input.kind, input.values),
+			),
+		),
+	save: protectedProcedure
+		.input(valuesInput)
+		.handler(async ({ input, context }) => {
+			await saveCredentials(
+				input.kind,
+				await prepare(input.kind, input.values),
+			);
+			return probe(context.session.user.id, input.kind);
+		}),
+	clear: protectedProcedure
+		.input(z.object({ kind: kindInput }))
+		.handler(async ({ input }) => {
+			await clearCredentials(input.kind);
+			return { ok: true as const };
+		}),
 };

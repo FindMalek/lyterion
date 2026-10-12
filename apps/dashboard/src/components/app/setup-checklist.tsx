@@ -51,7 +51,7 @@ export function SetupChecklist() {
 							</span>
 							{status !== "ok" && (
 								<Link
-									href="/connections"
+									href={`/connections?edit=${row.id}`}
 									className="font-mono text-muted-foreground hover:text-foreground"
 								>
 									set up →

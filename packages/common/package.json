@@ -11,6 +11,9 @@
 		".": {
 			"default": "./src/index.ts"
 		},
+		"./credentials": {
+			"default": "./src/credentials/index.ts"
+		},
 		"./trigger/tasks/*": {
 			"default": "./src/trigger/tasks/*.ts"
 		}
