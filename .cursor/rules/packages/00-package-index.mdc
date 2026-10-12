@@ -1,0 +1,38 @@
+---
+description: Index of all shared packages, what each does and when to use it
+globs:
+  - "packages/**"
+alwaysApply: false
+---
+
+# Package Index
+
+## `@lyterion/ai-provider`
+`getAIModel(task)` / `getModelId(task)` resolve the model for a task (`candidatePick`, `candidatePickHard`), `isProviderConfigured(task)` gates on the credential, `withLLMRetry()` shares 429-aware backoff. The only place allowed to construct a provider client.
+
+## `@lyterion/auth`
+`createAuth()`: one Better Auth instance, Spotify OAuth at `/api/auth`. Import the live instance from `@lyterion/core`.
+
+## `@lyterion/common`
+Business logic and Trigger.dev tasks. Layout per `docs/architecture.md`: `spotify/`, `identity/`, `providers/`, `verify/`, `library/`, `trigger/tasks/`.
+
+## `@lyterion/config`
+Shared `tsconfig.base.json`.
+
+## `@lyterion/core`
+Wires `database` and `auth` singletons so packages never import each other in a cycle.
+
+## `@lyterion/db`
+Drizzle schema (`src/schema/`), generated migrations (`src/migrations/`), `db` client on `pg`.
+
+## `@lyterion/env`
+Zod env presets: `apiEnv`, `dashboardEnv`, `dbEnv`. Server code imports `@lyterion/env/server`.
+
+## `@lyterion/logger`
+Pino logger.
+
+## `@lyterion/orpc`
+Routers, `publicProcedure` / `protectedProcedure`, context, typed client.
+
+## `@lyterion/ui`
+shadcn/ui components, theme tokens, `Providers`.

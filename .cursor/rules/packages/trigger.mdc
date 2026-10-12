@@ -1,0 +1,40 @@
+---
+description: Trigger.dev task conventions for the self-hosted instance
+globs:
+  - "packages/common/src/trigger/**"
+  - "apps/api/trigger.config.ts"
+  - "apps/api/src/trigger/**"
+alwaysApply: false
+---
+
+# Trigger.dev Tasks
+
+## Where things run
+
+- Self-hosted Trigger.dev v4 on `the-keep`, never Trigger.dev cloud (D-003)
+- The CLI and SDK find it through `LYTERION_TRIGGER_API_URL` (mapped to `TRIGGER_API_URL` by the root scripts)
+- Env vars used inside tasks must be set on the self-hosted project environment, `pnpm deploy:trigger` does not sync `.env`
+
+## Task pattern
+
+```typescript
+import { task } from "@trigger.dev/sdk";
+
+export const acquireRecordingTask = task({
+  id: "acquire.recording",
+  queue: { name: "acquire", concurrencyLimit: 4 },
+  run: async ({ recordingId }: { recordingId: string }) => {
+    return acquireRecording(recordingId);
+  },
+});
+```
+
+- Task ids follow the pipeline names in `docs/pipeline.md` (`spotify.export`, `acquire.recording`, `navidrome.scan`...)
+- Per-provider concurrency lives in named queues (`docs/providers.md` § Rate and concurrency)
+- Idempotency keys per `docs/pipeline.md` § Idempotency
+- No parent task waits hours on children: stages advance event-driven through DB counters (D-014)
+- Progress per stage goes through a single `updateStageProgress` style helper, never a full JSONB overwrite
+
+## LLM keys in tasks
+
+Resolve models through `getAIModel(task)` from `@lyterion/ai-provider`, gate on `isProviderConfigured(task)`.

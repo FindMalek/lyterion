@@ -1,0 +1,27 @@
+---
+description: Dashboard app conventions, structure, data fetching, UI density
+globs:
+  - "apps/dashboard/**"
+alwaysApply: false
+---
+
+# Dashboard App (`apps/dashboard`)
+
+## Structure
+
+```
+src/
+  app/login/            owner Spotify sign-in
+  app/(dashboard)/      signed-in shell, one folder per screen from docs/ui.md
+  components/auth/      sign-in button
+  components/layout/    providers
+  components/shared/    page header, empty / error / loading states
+  shared/api/           oRPC client (orpc.tsx), server client, session, query keys, auth client
+  lib/                  env, site url, utils
+```
+
+## Rules
+
+- Server state through TanStack Query + oRPC (`orpc.<route>.queryOptions()`), keys in `shared/api/query-keys.ts`
+- Session checks happen in `(dashboard)/layout.tsx` via `getServerSession()`, there is no proxy gate (single owner)
+- UI follows `docs/ui.md` (D-015): tables over cards, 13px base, monospace for data, `h-9` headers, no rounded corners, color only for status

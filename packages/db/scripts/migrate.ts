@@ -7,8 +7,7 @@ const repoRoot = path.resolve(__dirname, "../../..");
 
 dotenv.config({ path: path.join(repoRoot, ".env") });
 
-// drizzle-kit's own `migrate` CLI hides the driver error behind its spinner,
-// so call drizzle-orm's migrate() directly and print the real failure.
+// drizzle-kit's migrate CLI hides driver errors behind its spinner, so call migrate() directly.
 async function main() {
 	const connectionString = process.env.LYTERION_DATABASE_URL;
 	if (!connectionString) {

@@ -1,0 +1,66 @@
+---
+description: shadcn/ui component conventions, Tailwind patterns, and composition rules
+globs:
+  - "packages/ui/**"
+  - "apps/*/src/components/**"
+alwaysApply: false
+---
+
+# `@lyterion/ui`
+
+## Using Components
+
+```typescript
+// Within an app
+import { Button } from "@/components/ui/button";
+import { Icons } from "@lyterion/ui";
+
+// Across packages
+import { Button } from "@lyterion/ui";
+```
+
+## Tailwind
+
+- Sorted automatically by Biome (`cn`, `clsx`, `cva` calls)
+- Use `cn()` from `@/lib/utils` for conditional classes
+- Responsive: mobile-first (`sm:`, `md:`, `lg:`)
+- Dark mode: `dark:` prefix (managed by `next-themes`)
+- **Tabs** for indentation (enforced by Biome)
+
+## Card vs. Flat Section
+
+- **`<Card>`** — use for elevated interactive surfaces: grids of clickable items, feature highlight blocks. Uses `ring-1 ring-foreground/10` with `rounded-none`. Sizes: `default`, `sm`.
+- **Flat bordered section** (`DashboardSettingsSection` or inline `border` + section label) — use for informational grouped rows: settings, metadata, stats. Uses CSS `border` at full opacity with `border-b py-4 last:border-b-0` on each row.
+
+Do NOT use `<Card>` for settings sections, stat blocks, or metadata rows.
+
+## Forms
+
+- Build forms with `@tanstack/react-form`'s `useForm` + the shadcn `Field`/`FieldGroup`/`FieldLabel`/`FieldError`/`FieldDescription` primitives from `@lyterion/ui`.
+- Keep every form-adjacent value — including checkboxes/toggles that don't post to the backend — inside a `form.Field`, not a sibling `useState`. The form is the single source of truth; strip UI-only fields out of `value` in `onSubmit` before sending the payload.
+- Use `Label` from `@lyterion/ui` for any standalone label, never a raw `<label>`.
+
+## Do Not
+
+- Copy-paste shadcn component source into app directories — extend via props instead
+- Use native `<button>`, `<input>`, `<a>` when a shadcn equivalent exists
+- Use inline styles — Tailwind utilities only
+- Use `Dialog` for destructive confirmation — use `AlertDialog`
+- Nest `Card` inside `Card`
+- Reach for ad-hoc hex colors — use theme tokens (`bg-background`, `text-muted-foreground`, `border-border`, `ring-ring`)
+- Ship empty/loading/error states without a designed treatment (`Skeleton`, `Alert`, `ErrorState`)
+
+## Reach For This First
+
+| Use case | Components |
+|---|---|
+| Settings page | `Tabs` + `Card` + `Form` |
+| Data table / CRUD | `Table` + `DropdownMenu` + `Sheet` + `AlertDialog` |
+| Detail page | header + `Badge` + `Separator` + `Card` |
+| Global search | `Command` + `Dialog` |
+| Mobile nav / filters | `Sheet` |
+
+## Gotchas
+
+- `Avatar` has no `size` prop — size via Tailwind (`className="h-6 w-6"`), not a variant.
+- `Tooltip` needs a `TooltipProvider` ancestor for shared `delayDuration`/skip-delay behavior across adjacent tooltips — wrap once at the app root layout, not per-component.

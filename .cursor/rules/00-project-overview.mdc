@@ -1,0 +1,47 @@
+---
+description: Lyterion monorepo structure, stack, development commands, and hard rules
+alwaysApply: true
+---
+
+# Project Overview
+
+## What is Lyterion
+
+Lyterion is a personal, self-hosted tool that migrates the owner's Spotify library (liked songs, saved albums, followed artists, playlists) to their Navidrome server, finding each track across many source providers. It runs on the homelab (`the-keep`, Dokploy) with self-hosted Trigger.dev. Planning and every decision live in `docs/` (start at `docs/README.md`, decisions in `docs/decisions.md` win over everything else).
+
+It is a **pnpm + Turborepo monorepo** with two Next.js (App Router) apps and shared packages.
+
+## Monorepo Structure
+
+### Applications
+
+- `apps/api` (`api`): Next.js API server (port 3001), oRPC, Better Auth (owner Spotify login), Trigger.dev config
+- `apps/dashboard` (`dashboard`): Next.js owner dashboard (port 3002)
+
+### Packages
+
+- `packages/ai-provider`: `getAIModel(task)` for the LLM candidate picker (Groq now, Jev later)
+- `packages/auth`: Better Auth factory, Spotify only
+- `packages/common`: providers, matching, verification, library ops, Trigger.dev tasks
+- `packages/config`: Shared `tsconfig.base.json`
+- `packages/core`: Wires the DB and `auth` singletons
+- `packages/db`: Drizzle ORM schema + migrations + DB client
+- `packages/env`: Zod-validated env presets (never use `process.env` directly)
+- `packages/logger`: Pino structured logger
+- `packages/orpc`: oRPC routers, procedures, context, and client
+- `packages/ui`: shadcn/ui component library + shared Tailwind config (monochrome, radius 0, D-015)
+
+## Hard Rules
+
+1. **Never `process.env` directly.** Use `import { env } from "@lyterion/env/server"`.
+2. **Never construct an LLM provider client outside `@lyterion/ai-provider`.** Use `getAIModel(task)`.
+3. **Background jobs use `@trigger.dev/sdk` only**, deployed to the self-hosted instance, never Trigger.dev cloud (D-003).
+4. **All env vars prefixed `LYTERION_` or `NEXT_PUBLIC_LYTERION_`.**
+5. **Never touch files outside the `lyterion/` subtree of the music library** (D-012).
+6. **Migrations come from `pnpm db:generate`**, never hand-written.
+
+## Git commits
+
+`type(scope): subject`, subject at most 5 words, lowercase, imperative (`feat(spotify): export liked songs`).
+
+Do **not** name AI assistants, IDEs, or vendor coding tools in commit messages, PR titles, or PR bodies. Do **not** add `Co-authored-by:` lines for tools.

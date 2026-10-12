@@ -145,9 +145,7 @@ function getLogger(): Logger {
 		return loggerInstance;
 	}
 
-	// Infra package: direct process.env access is intentional — @lyterion/env
-	// cannot be imported here because the logger is used in browser contexts where
-	// env validation would run before Next.js has bundled NEXT_PUBLIC_* vars.
+	// Direct process.env on purpose: the logger runs in browser bundles where @lyterion/env can't validate.
 	const nodeEnv =
 		process.env.NEXT_PUBLIC_LYTERION_NODE_ENV ?? process.env.NODE_ENV;
 	const isDevelopment = nodeEnv !== "production";
