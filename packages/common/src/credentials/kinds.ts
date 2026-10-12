@@ -72,6 +72,38 @@ export const CREDENTIAL_KINDS = {
 		],
 		help: "Tidal/Qobuz/Deezer proxy backends (hifi-api style). Health-checked and rotated.",
 	},
+	lidarr: {
+		schema: z.object({
+			url,
+			apiKey: key,
+			lidarrRoot: z.string().trim().optional(),
+			localRoot: z.string().trim().optional(),
+		}),
+		fields: [
+			{
+				name: "url",
+				label: "url",
+				secret: false,
+				placeholder: "http://lidarr:8686",
+			},
+			{ name: "apiKey", label: "api key", secret: true },
+			{
+				name: "lidarrRoot",
+				label: "lidarr root",
+				secret: false,
+				optional: true,
+				placeholder: "/music (as lidarr sees it)",
+			},
+			{
+				name: "localRoot",
+				label: "worker path",
+				secret: false,
+				optional: true,
+				placeholder: "/lidarr (same folder in the worker)",
+			},
+		],
+		help: "Lidarr → Settings → General → API key. Saved albums still missing tracks after a run are requested from Lidarr; its files are copied, never moved.",
+	},
 	deezer: {
 		schema: z.object({ arl: key }),
 		fields: [{ name: "arl", label: "arl cookie", secret: true }],

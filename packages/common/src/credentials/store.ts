@@ -50,6 +50,8 @@ export function envCredentials(kind: CredentialKind): RawCredentials | null {
 			return env.LYTERION_PROXY_BACKENDS.length > 0
 				? { backends: env.LYTERION_PROXY_BACKENDS.join("\n") }
 				: null;
+		case "lidarr":
+			return null;
 		case "deezer":
 			return pick({ arl: env.LYTERION_DEEZER_ARL });
 		case "acoustid":

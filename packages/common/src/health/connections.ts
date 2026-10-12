@@ -8,6 +8,7 @@ export type ConnectionId =
 	| "navidrome"
 	| "slskd"
 	| "proxy"
+	| "lidarr"
 	| "deezer"
 	| "youtube"
 	| "acoustid"
@@ -31,6 +32,7 @@ export type ConnectionsEnv = {
 	navidrome?: { url: string; user: string; password: string };
 	slskd?: { url: string; apiKey: string };
 	proxyBackends: string[];
+	lidarr?: { url: string; apiKey: string };
 	deezerArl?: string;
 	ytdlpCookiesPath?: string;
 	acoustidKey?: string;
@@ -188,6 +190,25 @@ export async function checkConnections(
 							ok: res.ok,
 							detail: res.ok ? undefined : `HTTP ${res.status}`,
 						};
+					}
+				: null,
+		],
+		[
+			"lidarr",
+			"Lidarr",
+			!!env.lidarr,
+			env.lidarr
+				? async () => {
+						const { url, apiKey } = env.lidarr as NonNullable<
+							ConnectionsEnv["lidarr"]
+						>;
+						const res = await get(
+							`${url.replace(/\/$/, "")}/api/v1/system/status`,
+							{ "X-Api-Key": apiKey },
+						);
+						if (!res.ok) return { ok: false, detail: `HTTP ${res.status}` };
+						const body = (await res.json()) as { version?: string };
+						return { ok: true, detail: `lidarr ${body.version ?? ""}`.trim() };
 					}
 				: null,
 		],

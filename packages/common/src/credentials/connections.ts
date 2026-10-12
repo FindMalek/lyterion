@@ -14,24 +14,36 @@ export async function resolveConnectionsEnv(
 			override?.kind === kind ? override.raw : (await rawCredentials(kind)).raw;
 		return parseCredentials(kind, raw);
 	}
-	const [spotify, navidrome, slskd, proxy, deezer, acoustid, groq, jev, ntfy] =
-		await Promise.all([
-			load("spotify"),
-			load("navidrome"),
-			load("slskd"),
-			load("proxy"),
-			load("deezer"),
-			load("acoustid"),
-			load("groq"),
-			load("jev"),
-			load("ntfy"),
-		]);
+	const [
+		spotify,
+		navidrome,
+		slskd,
+		proxy,
+		lidarr,
+		deezer,
+		acoustid,
+		groq,
+		jev,
+		ntfy,
+	] = await Promise.all([
+		load("spotify"),
+		load("navidrome"),
+		load("slskd"),
+		load("proxy"),
+		load("lidarr"),
+		load("deezer"),
+		load("acoustid"),
+		load("groq"),
+		load("jev"),
+		load("ntfy"),
+	]);
 	return {
 		spotifyLinked,
 		spotifyApp: spotify ?? undefined,
 		navidrome: navidrome ?? undefined,
 		slskd: slskd ?? undefined,
 		proxyBackends: proxy?.backends ?? [],
+		lidarr: lidarr ?? undefined,
 		deezerArl: deezer?.arl,
 		ytdlpCookiesPath: env.LYTERION_YTDLP_COOKIES_PATH,
 		acoustidKey: acoustid?.apiKey,

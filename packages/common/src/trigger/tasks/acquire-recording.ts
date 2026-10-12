@@ -28,6 +28,7 @@ import {
 import type { Provider } from "../../providers/types";
 import { createAcoustidClient } from "../../verify/acoustid";
 import { verifyFile } from "../../verify/index";
+import { lidarrRequestTask } from "./lidarr-request";
 import { navidromeScanTask, requestScan } from "./navidrome-scan";
 
 export const ACQUIRE_STAGE = "acquire";
@@ -111,6 +112,7 @@ export async function acquireOne(
 	if (stageComplete(progress) && (await claimStage(payload.runId, "finish"))) {
 		await finishRun(payload.runId, "done");
 		await navidromeScanTask.trigger({ force: true });
+		await lidarrRequestTask.trigger(undefined);
 		const summary = await runSummary();
 		await notifyOwner({
 			kind: "run_finished",

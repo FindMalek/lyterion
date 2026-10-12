@@ -1,5 +1,6 @@
 import { env } from "@lyterion/env/server";
 import { pacer } from "../acquire/pace";
+import { createLidarrProvider } from "../providers/lidarr";
 import { createProxyProvider } from "../providers/proxy";
 import { createSlskdProvider, MIN_SEARCH_GAP_MS } from "../providers/slskd";
 import type { Provider } from "../providers/types";
@@ -11,12 +12,14 @@ const YOUTUBE_JITTER_MS = 4_000;
 
 /** Providers with credentials set, built fresh per task run so a dashboard edit applies on the next run. */
 export async function configuredProviders(): Promise<Provider[]> {
-	const [slskd, proxy] = await Promise.all([
+	const [slskd, proxy, lidarr] = await Promise.all([
 		getCredentials("slskd"),
 		getCredentials("proxy"),
+		getCredentials("lidarr"),
 	]);
 	const providers: Provider[] = [];
 	if (proxy) providers.push(createProxyProvider({ backends: proxy.backends }));
+	if (lidarr) providers.push(createLidarrProvider(lidarr));
 	if (slskd)
 		providers.push(
 			createSlskdProvider({

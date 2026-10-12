@@ -79,7 +79,7 @@ export const REQUIRED_CONNECTIONS = ["spotify", "navidrome"];
 
 export const CONNECTION_GROUPS: ConnectionGroup[] = [
 	{ title: "Required", ids: REQUIRED_CONNECTIONS },
-	{ title: "Sources", ids: ["slskd", "proxy", "deezer", "youtube"] },
+	{ title: "Sources", ids: ["slskd", "proxy", "lidarr", "deezer", "youtube"] },
 	{ title: "Matching", ids: ["acoustid", "groq", "jev"] },
 	{ title: "System", ids: ["trigger", "ntfy"] },
 ];
