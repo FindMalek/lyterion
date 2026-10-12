@@ -11,7 +11,8 @@ services:
       RUNNER_TOKEN: ${RUNNER_TOKEN}
       RUNNER_NAME: the-keep
       LABELS: the-keep
-      EPHEMERAL: "false"
+      # Any EPHEMERAL value, even "false", turns ephemeral mode on in this image, so it is left unset.
+      DISABLE_AUTOMATIC_DEREGISTRATION: "true"
       DISABLE_AUTO_UPDATE: "true"
       RUNNER_WORKDIR: /tmp/runner/work
       # Keeps the registration across restarts, so the 1h registration token is only needed once.
