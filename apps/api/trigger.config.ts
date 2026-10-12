@@ -41,8 +41,9 @@ export default defineConfig({
 		extensions: [
 			ffmpeg(),
 			aptGet({
-				packages: ["libchromaprint-tools", "python3", "python3-mutagen"],
+				packages: ["libchromaprint-tools", "python3", "python3-mutagen", "sox"],
 			}),
+			ytDlp(),
 			additionalFiles({
 				files: ["../../packages/common/python/write_tags.py"],
 			}),
