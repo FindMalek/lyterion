@@ -1,0 +1,8 @@
+# The official supervisor with one addition: DOCKER_RUNNER_BINDS mounts host folders into every run (D-042, #5).
+ARG TRIGGER_VERSION=v4.7.3
+FROM ghcr.io/triggerdotdev/supervisor:${TRIGGER_VERSION}
+
+USER root
+COPY patch-binds.sh /tmp/patch-binds.sh
+RUN sh /tmp/patch-binds.sh && rm /tmp/patch-binds.sh
+USER node
