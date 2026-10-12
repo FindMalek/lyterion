@@ -4,6 +4,10 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { oAuthProxy } from "better-auth/plugins";
 
+import { ownerOnlyGate } from "./owner-gate";
+
+export { ownerOnlyGate } from "./owner-gate";
+
 export type AuthEnvConfig = {
 	LYTERION_BETTER_AUTH_SECRET: string;
 	LYTERION_SPOTIFY_CLIENT_ID: string;
@@ -26,6 +30,7 @@ const SPOTIFY_SCOPES = [
 export function createAuth(
 	database: Parameters<typeof drizzleAdapter>[0],
 	envConfig: AuthEnvConfig,
+	countUsers: () => Promise<number>,
 ) {
 	const apiUrl = envConfig.NEXT_PUBLIC_LYTERION_API_URL;
 	// Spotify only accepts exact redirect URIs, so previews route the callback through production (D-036).
@@ -47,6 +52,9 @@ export function createAuth(
 				: {}),
 		},
 		database: drizzleAdapter(database, { provider: "pg", schema }),
+		databaseHooks: {
+			user: { create: { before: ownerOnlyGate(countUsers) } },
+		},
 		trustedOrigins: [
 			apiUrl,
 			productionApiUrl,

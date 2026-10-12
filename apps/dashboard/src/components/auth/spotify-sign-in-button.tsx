@@ -12,6 +12,7 @@ export function SpotifySignInButton() {
 				authClient.signIn.social({
 					provider: "spotify",
 					callbackURL: getSiteUrl(),
+					errorCallbackURL: `${getSiteUrl()}/login`,
 				})
 			}
 		>

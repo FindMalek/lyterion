@@ -11,7 +11,8 @@
 		}
 	},
 	"scripts": {
-		"build": "tsc --noEmit"
+		"build": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests"
 	},
 	"dependencies": {
 		"@lyterion/db": "workspace:*",
@@ -20,6 +21,7 @@
 	},
 	"devDependencies": {
 		"@lyterion/config": "workspace:*",
-		"typescript": "catalog:"
+		"typescript": "catalog:",
+		"vitest": "^5.0.0"
 	}
 }
