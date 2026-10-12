@@ -402,3 +402,11 @@ GitHub's CI instead.
   value can be rotated on its own.
 - **Kill switch:** deploys and previews only run when the repo var
   `DEPLOY_ENABLED` is `true`.
+
+## D-038 Dashboard server calls the api over `dokploy-network` (2026-10-12)
+
+Both public hosts sit behind `tailnet-only@file`, so the dashboard container
+can't reach `api.lyterion.findmalek.engineer`: its session check failed and
+every sign-in bounced back to `/login`. Server-side calls now use
+`LYTERION_API_INTERNAL_URL` (`http://<api appName>:3001`), set by
+`scripts/deploy/dokploy.mjs`. The browser keeps using the public url.

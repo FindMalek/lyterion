@@ -146,7 +146,29 @@ async function deployApp(environment, app) {
 	});
 	await ensureDomain(applicationId, app.host, app.port);
 	await dokploy("application.deploy", { applicationId });
-	return { ...app, applicationId, projectId: environment.projectId };
+	return {
+		...app,
+		applicationId,
+		appName: application.appName,
+		projectId: environment.projectId,
+	};
+}
+
+// The public api host is tailnet-only, so the dashboard's server calls the api by its swarm service name.
+async function deployAll(environment, apps) {
+	const deployed = [];
+	for (const app of apps) {
+		const api = deployed.find((d) => d.port === 3001);
+		const env =
+			api && app.port === 3002
+				? {
+						...app.env,
+						LYTERION_API_INTERNAL_URL: `http://${api.appName}:3001`,
+					}
+				: app.env;
+		deployed.push(await deployApp(environment, { ...app, env }));
+	}
+	return deployed;
 }
 
 async function waitForApps(deployed, onChange) {
@@ -322,8 +344,7 @@ async function previewUp() {
 		sharedEnv: parseEnvBlock(process.env.PREVIEW_APP_ENV),
 	});
 	await upsertComment(renderComment(apps));
-	const deployed = [];
-	for (const app of apps) deployed.push(await deployApp(environment, app));
+	const deployed = await deployAll(environment, apps);
 	const ok = await waitForApps(deployed, () =>
 		upsertComment(renderComment(deployed)),
 	);
@@ -363,8 +384,7 @@ async function production() {
 		databaseUrl: postgresUrl(pg),
 		sharedEnv,
 	});
-	const deployed = [];
-	for (const app of apps) deployed.push(await deployApp(environment, app));
+	const deployed = await deployAll(environment, apps);
 	const ok = await waitForApps(deployed, async () => {});
 	for (const d of deployed) console.info(`${d.name}: ${d.status}`);
 	if (!ok) process.exitCode = 1;

@@ -1,9 +1,9 @@
 import { createORPCClientUtils } from "@lyterion/orpc/client";
-import { env } from "@/lib/env";
+import { serverApiUrl } from "@/lib/server-api-url";
 
 // Server-only client, forwards request headers (session cookie included).
 const { client } = createORPCClientUtils({
-	apiUrl: env.NEXT_PUBLIC_LYTERION_API_URL,
+	apiUrl: serverApiUrl(),
 	getHeaders: async () => {
 		const { headers } = await import("next/headers");
 		return Object.fromEntries(await headers());

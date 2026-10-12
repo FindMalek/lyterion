@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { z } from "zod";
-import { env } from "@/lib/env";
+import { serverApiUrl } from "@/lib/server-api-url";
 
 const sessionSchema = z.object({
 	user: z.object({
@@ -29,16 +29,14 @@ export async function getSessionFromCookie(
 	cookie: string | null,
 ): Promise<Session | null> {
 	try {
-		const res = await fetch(
-			`${env.NEXT_PUBLIC_LYTERION_API_URL}/api/auth/get-session`,
-			{
-				headers: cookie ? { cookie } : undefined,
-				credentials: "include",
-				cache: "no-store",
-			},
-		);
+		const res = await fetch(`${serverApiUrl()}/api/auth/get-session`, {
+			headers: cookie ? { cookie } : undefined,
+			credentials: "include",
+			cache: "no-store",
+		});
 
 		if (!res.ok) {
+			console.error(`[auth] get-session returned ${res.status}`);
 			return null;
 		}
 
@@ -52,7 +50,8 @@ export async function getSessionFromCookie(
 			return data.data;
 		}
 		return data;
-	} catch {
+	} catch (error) {
+		console.error(`[auth] get-session unreachable at ${serverApiUrl()}`, error);
 		return null;
 	}
 }

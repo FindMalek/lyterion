@@ -5,7 +5,9 @@ import { dbEnv } from "./db";
 
 export const dashboardEnv = createEnv({
 	extends: [dbEnv],
-	server: {},
+	server: {
+		...urlsModule.server,
+	},
 	client: {
 		...clientModule.client,
 		...urlsModule.client,

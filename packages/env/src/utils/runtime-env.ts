@@ -11,6 +11,7 @@ export function createServerRuntimeEnv(): NodeJS.ProcessEnv {
 export function createNextjsRuntimeEnv() {
 	return {
 		LYTERION_DATABASE_URL: process.env.LYTERION_DATABASE_URL,
+		LYTERION_API_INTERNAL_URL: process.env.LYTERION_API_INTERNAL_URL,
 		NEXT_PUBLIC_LYTERION_NODE_ENV: process.env.NEXT_PUBLIC_LYTERION_NODE_ENV,
 		NEXT_PUBLIC_LYTERION_API_URL: process.env.NEXT_PUBLIC_LYTERION_API_URL,
 		NEXT_PUBLIC_LYTERION_ALLOWED_ORIGIN:
