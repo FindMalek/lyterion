@@ -45,3 +45,19 @@ ranking and upgrades.
 Codec, bitrate, sample rate, bit depth, duration, fingerprint, AcoustID
 recording, spectral cutoff Hz, verified lossless, source provider plus ref,
 and fetch time. That's everything the upgrade cron and the dashboard need.
+
+## Measuring AcoustID coverage (S7, #21)
+
+Trigger.dev → Tasks → `acoustid.coverage` → Test with `{}` (or
+`{"dir": "/music/lyterion", "size": 200}`). It fingerprints a random sample
+of real files, 200 by default from slskd's downloads, and reports:
+
+- `known`: AcoustID returned a recording at score ≥ 0.5, so the verifier can
+  confirm or reject the file
+- `fingerprintOnly`: the fingerprint is known but has no MusicBrainz
+  recording, which the verifier treats as unknown
+- `unknown`, `errors`, `knownPercent`, the split by format and the score buckets
+
+A low `knownPercent` means `unverified_match` (D-023) will be common, and the
+match-confidence bar for accepting an unverified file matters more than the
+fingerprint.
