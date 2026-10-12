@@ -116,6 +116,23 @@ describe("resolveIdentity", () => {
 	});
 });
 
+describe("resolveIdentity overrides", () => {
+	it("splits a merged track out when the owner says so", () => {
+		const tracks = [
+			track({ id: "t-album", isrc: "GBUM71029604", albumId: "mezz" }),
+			track({ id: "t-comp", isrc: "GBUM71029604", albumId: "best" }),
+		];
+		const { recordings } = resolveIdentity({
+			tracks,
+			albums,
+			savedAlbumIds: new Set(),
+			existingMembers: new Map(),
+			overrides: [{ kind: "split", trackIds: ["t-album", "t-comp"] }],
+		});
+		expect(recordings).toHaveLength(2);
+	});
+});
+
 describe("releaseType", () => {
 	it("maps Spotify album types, with 4+ track singles as EPs", () => {
 		expect(releaseType("album", 10)).toBe("album");

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { type GroupTrack, groupRecordings } from "./group";
+import { type GroupOverride, type GroupTrack, groupRecordings } from "./group";
 import { parseTitle } from "./normalize";
 import {
 	type PlacementRelease,
@@ -31,6 +31,7 @@ export type ResolveInput = {
 	savedAlbumIds: Set<string>;
 	existingMembers: Map<string, string>;
 	previousPlacements?: Map<string, string[]>;
+	overrides?: GroupOverride[];
 	newId?: () => string;
 };
 
@@ -83,7 +84,7 @@ export function resolveIdentity(input: ResolveInput): {
 } {
 	const newId = input.newId ?? randomUUID;
 	const byId = new Map(input.tracks.map((t) => [t.id, t]));
-	const groups = groupRecordings(input.tracks);
+	const groups = groupRecordings(input.tracks, { overrides: input.overrides });
 
 	const recordingOfTrack = new Map<string, string>();
 	const recordings: ResolvedRecording[] = groups.map((group) => {

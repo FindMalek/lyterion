@@ -1,3 +1,5 @@
+import { db } from "@lyterion/db";
+import { providerHealth } from "@lyterion/db/schema/library";
 import { logger, schedules } from "@trigger.dev/sdk";
 
 import { configuredProviders } from "../../credentials/providers";
@@ -18,6 +20,12 @@ export const providersHealthTask = schedules.task({
 				ok: false,
 				detail: err instanceof Error ? err.message : String(err),
 			}));
+			await db.insert(providerHealth).values({
+				providerId: provider.id,
+				ok: health.ok,
+				latencyMs: "latencyMs" in health ? (health.latencyMs ?? null) : null,
+				detail: health.detail ?? null,
+			});
 			const downKey = `health.${provider.id}.downSince`;
 			const alertKey = `health.${provider.id}.alerted`;
 			const downSince = await getCursor(downKey);

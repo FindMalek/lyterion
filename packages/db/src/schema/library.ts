@@ -185,3 +185,46 @@ export const navidromeScanState = pgTable("navidrome_scan_state", {
 	lastPlacedAt: timestamp("last_placed_at"),
 	lastScanAt: timestamp("last_scan_at"),
 });
+
+// Owner decisions on grouping (#19): applied after the computed edges on the next identity.resolve.
+export const recordingOverride = pgTable(
+	"recording_override",
+	{
+		id: serial("id").primaryKey(),
+		kind: text("kind").$type<"merge" | "split">().notNull(),
+		trackA: text("track_a").notNull(),
+		trackB: text("track_b").notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => [
+		uniqueIndex("recording_override_pair_idx").on(
+			table.kind,
+			table.trackA,
+			table.trackB,
+		),
+	],
+);
+
+export const playlistWrite = pgTable("playlist_write", {
+	name: text("name").primaryKey(),
+	path: text("path").notNull(),
+	entries: integer("entries").notNull(),
+	missing: integer("missing").notNull(),
+	writtenAt: timestamp("written_at").notNull(),
+	checkedAt: timestamp("checked_at").defaultNow().notNull(),
+});
+
+export const providerHealth = pgTable(
+	"provider_health",
+	{
+		id: serial("id").primaryKey(),
+		providerId: text("provider_id").notNull(),
+		checkedAt: timestamp("checked_at").defaultNow().notNull(),
+		ok: boolean("ok").notNull(),
+		latencyMs: integer("latency_ms"),
+		detail: text("detail"),
+	},
+	(table) => [
+		index("provider_health_provider_idx").on(table.providerId, table.checkedAt),
+	],
+);

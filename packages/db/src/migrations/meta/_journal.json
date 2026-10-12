@@ -57,6 +57,13 @@
 			"when": 1791821543426,
 			"tag": "0007_burly_shooting_star",
 			"breakpoints": true
+		},
+		{
+			"idx": 8,
+			"version": "7",
+			"when": 1791822160553,
+			"tag": "0008_pink_mantis",
+			"breakpoints": true
 		}
 	]
 }

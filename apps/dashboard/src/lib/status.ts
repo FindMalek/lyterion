@@ -97,3 +97,39 @@ export function formatDuration(
 	if (hours < 48) return `${hours}h ${minutes % 60}m`;
 	return `${Math.floor(hours / 24)}d ${hours % 24}h`;
 }
+
+export function formatBytes(bytes: number | null | undefined): string {
+	if (!bytes) return "";
+	if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)}GB`;
+	return `${Math.round(bytes / 1024 ** 2)}MB`;
+}
+
+export function formatQuality(file: {
+	codec: string | null;
+	bitrateKbps: number | null;
+	bitDepth: number | null;
+	sampleRateHz: number | null;
+}): string {
+	if (!file.codec) return "";
+	if (/^(flac|alac|pcm_)/.test(file.codec))
+		return `FLAC ${file.bitDepth ?? 16}${file.sampleRateHz ? `/${Math.round(file.sampleRateHz / 100) / 10}` : ""}`;
+	return `${file.codec.toUpperCase()} ${file.bitrateKbps ?? "?"}`;
+}
+
+export function percent(value: number | null): string {
+	return value == null ? "" : `${Math.round(value * 100)}%`;
+}
+
+// Recording lifecycle (docs/pipeline.md § Statuses) mapped to the one color rule.
+export function recordingState(status: string): {
+	status: Status;
+	label: string;
+} {
+	if (status === "placed" || status === "linked" || status === "existing")
+		return { status: "ok", label: status };
+	if (status === "missing") return { status: "error", label: status };
+	if (status === "review") return { status: "warn", label: status };
+	if (status === "searching" || status === "fetching" || status === "verifying")
+		return { status: "active", label: status };
+	return { status: "idle", label: status };
+}

@@ -17,6 +17,9 @@
 		"./spotify/sync-state": {
 			"default": "./src/spotify/sync-state.ts"
 		},
+		"./dashboard": {
+			"default": "./src/dashboard/queries.ts"
+		},
 		"./review": {
 			"default": "./src/review/persist.ts"
 		},

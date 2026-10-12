@@ -1,8 +1,11 @@
 import { rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { db } from "@lyterion/db";
+import { playlistWrite } from "@lyterion/db/schema/library";
 import { env } from "@lyterion/env/server";
 import { logger, task } from "@trigger.dev/sdk";
+import { sql } from "drizzle-orm";
 
 import { writePlaylist } from "../../library/playlist";
 import { playlistSpecs } from "../../library/playlists-persist";
@@ -44,6 +47,27 @@ export async function writeAllPlaylists() {
 			);
 			if (written.changed) changed++;
 			missing += written.missing;
+			const now = new Date();
+			await db
+				.insert(playlistWrite)
+				.values({
+					name: spec.name,
+					path: written.path,
+					entries: spec.entries.length,
+					missing: written.missing,
+					writtenAt: now,
+					checkedAt: now,
+				})
+				.onConflictDoUpdate({
+					target: playlistWrite.name,
+					set: {
+						path: written.path,
+						entries: spec.entries.length,
+						missing: written.missing,
+						checkedAt: now,
+						writtenAt: written.changed ? now : sql`${playlistWrite.writtenAt}`,
+					},
+				});
 		} finally {
 			if (cover) await rm(cover, { force: true });
 		}

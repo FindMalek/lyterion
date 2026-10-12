@@ -2,6 +2,7 @@ import { db } from "@lyterion/db";
 import {
 	recording,
 	recordingMember,
+	recordingOverride,
 	release,
 	releaseTrack,
 } from "@lyterion/db/schema/library";
@@ -22,20 +23,25 @@ import {
 const BATCH = 500;
 
 export async function loadResolveInput() {
-	const [tracks, albums, saved, members, previous] = await Promise.all([
-		db.select().from(spotifyTrack).where(eq(spotifyTrack.isLocal, false)),
-		db.select().from(spotifyAlbum),
-		db
-			.select({ id: librarySave.spotifyId })
-			.from(librarySave)
-			.where(
-				and(eq(librarySave.kind, "saved_album"), isNull(librarySave.removedAt)),
-			),
-		db.select().from(recordingMember),
-		db
-			.select({ id: recording.id, placed: recording.placedReleaseIds })
-			.from(recording),
-	]);
+	const [tracks, albums, saved, members, previous, overrides] =
+		await Promise.all([
+			db.select().from(spotifyTrack).where(eq(spotifyTrack.isLocal, false)),
+			db.select().from(spotifyAlbum),
+			db
+				.select({ id: librarySave.spotifyId })
+				.from(librarySave)
+				.where(
+					and(
+						eq(librarySave.kind, "saved_album"),
+						isNull(librarySave.removedAt),
+					),
+				),
+			db.select().from(recordingMember),
+			db
+				.select({ id: recording.id, placed: recording.placedReleaseIds })
+				.from(recording),
+			db.select().from(recordingOverride),
+		]);
 	return {
 		tracks: tracks.map((t) => ({
 			id: t.id,
@@ -62,6 +68,10 @@ export async function loadResolveInput() {
 		existingMembers: new Map(
 			members.map((m) => [m.spotifyTrackId, m.recordingId]),
 		),
+		overrides: overrides.map((o) => ({
+			kind: o.kind,
+			trackIds: [o.trackA, o.trackB] as [string, string],
+		})),
 		previousPlacements: new Map(
 			previous.filter((p) => p.placed.length > 0).map((p) => [p.id, p.placed]),
 		),

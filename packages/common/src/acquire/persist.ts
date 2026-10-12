@@ -1,4 +1,4 @@
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { db } from "@lyterion/db";
@@ -241,6 +241,9 @@ export async function recordOutcome(
 
 		if (outcome.status === "placed") {
 			const { facts } = outcome.verify;
+			const sizeBytes = await stat(outcome.path)
+				.then((st) => st.size)
+				.catch(() => null);
 			await tx
 				.insert(libraryFile)
 				.values({
@@ -253,6 +256,7 @@ export async function recordOutcome(
 					bitDepth: outcome.verify.effectiveBitDepth ?? facts.bitDepth,
 					sampleRateHz: facts.sampleRateHz,
 					durationMs: facts.durationMs,
+					sizeBytes,
 					spectralCutoffHz: Math.round(outcome.verify.cutoffHz),
 					verifiedLossless: outcome.verify.verifiedLossless,
 					sourceProvider: outcome.chosen.providerId,
@@ -271,6 +275,7 @@ export async function recordOutcome(
 						bitDepth: sql`excluded.bit_depth`,
 						sampleRateHz: sql`excluded.sample_rate_hz`,
 						durationMs: sql`excluded.duration_ms`,
+						sizeBytes: sql`excluded.size_bytes`,
 						spectralCutoffHz: sql`excluded.spectral_cutoff_hz`,
 						verifiedLossless: sql`excluded.verified_lossless`,
 						sourceProvider: sql`excluded.source_provider`,
