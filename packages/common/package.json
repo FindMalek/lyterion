@@ -37,6 +37,12 @@
 		},
 		"./onboarding": {
 			"default": "./src/onboarding/index.ts"
+		},
+		"./spotify/audit": {
+			"default": "./src/spotify/audit.ts"
+		},
+		"./spotify/owner": {
+			"default": "./src/spotify/owner.ts"
 		}
 	},
 	"dependencies": {

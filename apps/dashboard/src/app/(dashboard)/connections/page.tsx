@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { ConnectionsTable } from "@/components/app/connections-table";
+import { SpotifyAudit } from "@/components/app/spotify-audit";
 import { PageHeader } from "@/components/shared/page-header";
 
 export default function ConnectionsPage() {
@@ -13,6 +14,7 @@ export default function ConnectionsPage() {
 			<Suspense>
 				<ConnectionsTable />
 			</Suspense>
+			<SpotifyAudit />
 		</>
 	);
 }

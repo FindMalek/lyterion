@@ -10,6 +10,11 @@ import {
 	saveCredentials,
 	validateCredentials,
 } from "@lyterion/common/credentials";
+import { auditSpotify } from "@lyterion/common/spotify/audit";
+import {
+	ownerSpotifyAccount,
+	ownerToken,
+} from "@lyterion/common/spotify/owner";
 import { database } from "@lyterion/core";
 import { account } from "@lyterion/db/schema/auth";
 import { ORPCError } from "@orpc/server";
@@ -85,6 +90,16 @@ export const connectionsRouter = {
 			);
 			return probe(context.session.user.id, input.kind);
 		}),
+	// S2 (#8): every Spotify endpoint the export uses, hit with the owner's own app and token.
+	spotifyAudit: protectedProcedure.handler(async () => {
+		try {
+			return await auditSpotify(ownerToken(await ownerSpotifyAccount()));
+		} catch (err) {
+			throw new ORPCError("PRECONDITION_FAILED", {
+				message: err instanceof Error ? err.message : String(err),
+			});
+		}
+	}),
 	clear: protectedProcedure
 		.input(z.object({ kind: kindInput }))
 		.handler(async ({ input }) => {
