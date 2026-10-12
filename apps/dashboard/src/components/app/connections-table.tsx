@@ -9,32 +9,28 @@ import {
 	TableRow,
 } from "@lyterion/ui";
 import { useQuery } from "@tanstack/react-query";
-
+import {
+	CONNECTION_GROUPS,
+	type ConnectionRow,
+	connectionState,
+} from "@/lib/status";
 import { orpc } from "@/shared/api/orpc";
 
-import { type Status, StatusDot } from "./status-dot";
-
-function statusOf(row: { configured: boolean; ok: boolean | null }): {
-	status: Status;
-	label: string;
-} {
-	if (!row.configured) return { status: "idle", label: "not configured" };
-	if (row.ok === null) return { status: "warn", label: "configured" };
-	return row.ok
-		? { status: "ok", label: "ok" }
-		: { status: "error", label: "down" };
-}
+import { StatusLabel } from "./status-dot";
 
 export function ConnectionsTable() {
 	const { data, isFetching, refetch } = useQuery(
 		orpc.connections.list.queryOptions(),
+	);
+	const byId = new Map<string, ConnectionRow>(
+		(data ?? []).map((row) => [row.id, row]),
 	);
 
 	return (
 		<section>
 			<div className="flex h-8 items-center justify-between border-b px-3">
 				<h2 className="font-medium text-xs uppercase tracking-wide">
-					Connections
+					Services
 				</h2>
 				<button
 					type="button"
@@ -47,35 +43,70 @@ export function ConnectionsTable() {
 			<Table className="text-xs">
 				<TableHeader>
 					<TableRow>
-						<TableHead className="h-7 px-3">service</TableHead>
-						<TableHead className="h-7 px-3">status</TableHead>
-						<TableHead className="h-7 px-3 text-right">latency</TableHead>
+						<TableHead className="h-7 w-48 px-3">service</TableHead>
+						<TableHead className="h-7 w-36 px-3">status</TableHead>
+						<TableHead className="h-7 w-20 px-3 text-right">latency</TableHead>
 						<TableHead className="h-7 px-3">detail</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
-					{(data ?? []).map((row) => {
-						const { status, label } = statusOf(row);
-						return (
-							<TableRow key={row.id}>
-								<TableCell className="px-3 py-1.5">{row.label}</TableCell>
-								<TableCell className="px-3 py-1.5">
-									<span className="inline-flex items-center gap-2">
-										<StatusDot status={status} />
-										<span className="font-mono">{label}</span>
-									</span>
-								</TableCell>
-								<TableCell className="px-3 py-1.5 text-right font-mono">
-									{row.latencyMs === null ? "·" : `${row.latencyMs}ms`}
-								</TableCell>
-								<TableCell className="px-3 py-1.5 font-mono text-muted-foreground">
-									{row.detail ?? ""}
-								</TableCell>
-							</TableRow>
-						);
-					})}
+					{CONNECTION_GROUPS.map((group) => (
+						<GroupRows
+							key={group.title}
+							title={group.title}
+							rows={group.ids.flatMap((id) => byId.get(id) ?? [])}
+							loading={!data}
+						/>
+					))}
 				</TableBody>
 			</Table>
 		</section>
+	);
+}
+
+function GroupRows({
+	title,
+	rows,
+	loading,
+}: {
+	title: string;
+	rows: ConnectionRow[];
+	loading: boolean;
+}) {
+	return (
+		<>
+			<TableRow className="hover:bg-transparent">
+				<TableCell
+					colSpan={4}
+					className="bg-muted/40 px-3 py-1 font-mono text-[11px] text-muted-foreground"
+				>
+					{title.toLowerCase()}
+				</TableCell>
+			</TableRow>
+			{loading && (
+				<TableRow>
+					<TableCell
+						colSpan={4}
+						className="px-3 py-1.5 font-mono text-muted-foreground"
+					>
+						checking…
+					</TableCell>
+				</TableRow>
+			)}
+			{rows.map((row) => (
+				<TableRow key={row.id}>
+					<TableCell className="px-3 py-1.5">{row.label}</TableCell>
+					<TableCell className="px-3 py-1.5">
+						<StatusLabel {...connectionState(row)} />
+					</TableCell>
+					<TableCell className="px-3 py-1.5 text-right font-mono text-muted-foreground">
+						{row.latencyMs === null ? "" : `${row.latencyMs}ms`}
+					</TableCell>
+					<TableCell className="truncate px-3 py-1.5 font-mono text-muted-foreground">
+						{row.detail ?? ""}
+					</TableCell>
+				</TableRow>
+			))}
+		</>
 	);
 }
