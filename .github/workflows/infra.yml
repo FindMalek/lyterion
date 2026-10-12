@@ -1,12 +1,19 @@
-# Deploys the turbo cache compose to Dokploy from a GitHub hosted runner (D-036, D-037), run manually.
+# Deploys an infra compose to Dokploy from a GitHub hosted runner (D-036, D-037, #4), run manually.
 
 name: Infra
 
 on:
   workflow_dispatch:
     inputs:
+      stack:
+        description: "Which compose to deploy"
+        type: choice
+        options:
+          - turbo-cache
+          - trigger
+        default: turbo-cache
       remove_postgres_ids:
-        description: "Postgres ids to delete instead of deploying the cache (space separated)"
+        description: "Postgres ids to delete instead of deploying (space separated)"
         required: false
         default: ""
 
@@ -31,7 +38,20 @@ jobs:
           GARAGE_ACCESS_KEY: ${{ secrets.GARAGE_ACCESS_KEY }}
           GARAGE_SECRET_KEY: ${{ secrets.GARAGE_SECRET_KEY }}
         run: node scripts/deploy/dokploy.mjs ci-infra
-        if: inputs.remove_postgres_ids == ''
+        if: inputs.remove_postgres_ids == '' && inputs.stack == 'turbo-cache'
+
+      - name: Deploy lyterion-trigger compose
+        if: inputs.remove_postgres_ids == '' && inputs.stack == 'trigger'
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_PUBLIC_URL || 'https://dokploy.findmalek.engineer' }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          TRIGGER_PUBLIC_HOST: ${{ vars.TRIGGER_PUBLIC_HOST }}
+          TRIGGER_WHITELISTED_EMAILS: ${{ vars.TRIGGER_WHITELISTED_EMAILS }}
+          TRIGGER_GARAGE_ACCESS_KEY: ${{ secrets.TRIGGER_GARAGE_ACCESS_KEY }}
+          TRIGGER_GARAGE_SECRET_KEY: ${{ secrets.TRIGGER_GARAGE_SECRET_KEY }}
+          GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+        run: node scripts/deploy/dokploy.mjs trigger-infra
 
       - name: Remove orphaned Postgres services
         if: inputs.remove_postgres_ids != ''

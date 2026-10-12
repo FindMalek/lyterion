@@ -460,3 +460,33 @@ cover priority, and the files Lyterion writes:
   scanner logs "Found moved files" and repoints playlist entries itself.
   Lyterion still rewrites its m3u8 files, because the file on disk would
   otherwise keep the old extension.
+
+## D-042 Trigger.dev on Dokploy; runs cannot mount host folders (2026-10-12, #4, answers S1 / #5)
+
+- **Stack:** the official `hosting/docker` webapp + supervisor at `v4.7.3`,
+  merged into one Dokploy compose (`infra/the-keep/trigger.compose.yml`).
+  Garage replaces MinIO (D-016). GHCR replaces the bundled registry, since
+  the task image is built on GitHub runners (D-037) and a LAN registry is
+  out of their reach. The CLI is pinned to the same version.
+- **S1 answer: no.** The supervisor's Docker workload manager
+  (`apps/supervisor/src/workloadManager/docker.ts` at `v4.7.3`) only sets
+  `AutoRemove`, the networks and the CPU/memory presets on run containers.
+  There is no env option for binds or volumes. So `/srv/music`, staging and
+  slskd's downloads can't be mounted into runs as things stand.
+- **Open:** how the file work reaches the disk. Choice pending with Malek:
+  a supervisor patched with a `DOCKER_RUNNER_BINDS` option (a few lines,
+  rebuilt on each Trigger.dev upgrade), or `apps/librarian` from
+  `architecture.md` (no fork, but every fetch, verify, tag and place moves
+  behind an HTTP service).
+
+## D-043 Host folders reach runs through a patched supervisor (2026-10-12, answers the open part of D-042, #5)
+
+Malek picked the patched supervisor over `apps/librarian`.
+`infra/the-keep/supervisor/` builds `ghcr.io/findmalek/lyterion-supervisor`
+from the official `supervisor:v4.7.3` image plus one line in the compiled
+Docker workload manager: `Binds` from `DOCKER_RUNNER_BINDS`. The patch
+script fails the build if upstream moves that line, so an upgrade can't
+silently drop the mounts. On each Trigger.dev upgrade, bump the version in
+the compose, the supervisor workflow and `scripts/deploy-trigger.mjs`
+together. The pipeline code is unchanged: tasks keep using local paths
+(`/music`, `/staging`, `/slskd/downloads`).

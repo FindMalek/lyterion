@@ -1,0 +1,47 @@
+# Builds the patched Trigger.dev supervisor (DOCKER_RUNNER_BINDS, D-042) and pushes it to GHCR.
+
+name: Supervisor image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - infra/the-keep/supervisor/**
+      - .github/workflows/supervisor-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Keep in step with TRIGGER_IMAGE_TAG in infra/the-keep/trigger.compose.yml and the CLI in scripts/deploy-trigger.mjs.
+      TRIGGER_VERSION: v4.7.3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: infra/the-keep/supervisor
+          file: infra/the-keep/supervisor/Containerfile
+          build-args: TRIGGER_VERSION=${{ env.TRIGGER_VERSION }}
+          push: true
+          tags: |
+            ghcr.io/findmalek/lyterion-supervisor:${{ env.TRIGGER_VERSION }}
+            ghcr.io/findmalek/lyterion-supervisor:sha-${{ github.sha }}
