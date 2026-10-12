@@ -18,8 +18,7 @@ import {
 export * from "./acoustid";
 export * from "./audio";
 
-// Steps and thresholds: docs/verification.md, upgrade reasons: D-023.
-// LAME 320 transcodes measure ~20.3 kHz, real CD masters 21-22 kHz.
+// Steps and thresholds: docs/verification.md (LAME 320 measures ~20.3 kHz), upgrade reasons: D-023.
 const LOSSLESS_MIN_CUTOFF_HZ = 20_500;
 const HIGH_BITRATE_MIN_CUTOFF_HZ = 17_000;
 const UNVERIFIED_MIN_CONFIDENCE = 0.9;
