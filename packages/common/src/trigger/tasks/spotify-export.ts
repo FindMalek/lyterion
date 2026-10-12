@@ -17,7 +17,7 @@ import { identityResolveTask } from "./identity-resolve";
 
 const STAGE = "spotify.export";
 
-async function ownerSpotifyAccount(): Promise<{
+export async function ownerSpotifyAccount(): Promise<{
 	userId: string;
 	accountId: string;
 }> {
@@ -34,6 +34,20 @@ async function ownerSpotifyAccount(): Promise<{
 			"no owner with a linked Spotify account yet, sign in with Spotify first",
 		);
 	return owner;
+}
+
+export function ownerSpotifyClient(selection: {
+	userId: string;
+	accountId: string;
+}) {
+	return createSpotifyClient(async (forceRefresh) => {
+		const result = forceRefresh
+			? await auth.api.refreshToken({ body: selection })
+			: await auth.api.getAccessToken({ body: selection });
+		if (!result.accessToken)
+			throw new Error("spotify token unavailable, reconnect Spotify");
+		return result.accessToken;
+	});
 }
 
 export const spotifyExportTask = task({
@@ -53,18 +67,7 @@ export const spotifyExportTask = task({
 			status: "running",
 			startedAt: new Date().toISOString(),
 		});
-		const client = createSpotifyClient(async (forceRefresh) => {
-			const result = forceRefresh
-				? await auth.api.refreshToken({
-						body: selection,
-					})
-				: await auth.api.getAccessToken({
-						body: selection,
-					});
-			if (!result.accessToken)
-				throw new Error("spotify token unavailable, reconnect Spotify");
-			return result.accessToken;
-		});
+		const client = ownerSpotifyClient(selection);
 		let pages = 0;
 		try {
 			const incremental =

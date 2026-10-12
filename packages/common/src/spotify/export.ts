@@ -3,7 +3,7 @@ import { type SpotifyClient, SpotifyHttpError } from "./client";
 // Endpoints and edge cases: docs/spotify.md.
 type RawArtist = { id: string; name: string; genres?: string[] };
 type RawImage = { url: string; width?: number | null };
-type RawAlbum = {
+export type RawAlbum = {
 	id: string;
 	name: string;
 	artists: { id: string; name: string }[];
@@ -15,7 +15,7 @@ type RawAlbum = {
 	external_ids?: { upc?: string };
 	tracks?: { items: RawTrack[]; next: string | null };
 };
-type RawTrack = {
+export type RawTrack = {
 	id: string | null;
 	name: string;
 	type?: string;
@@ -105,7 +105,7 @@ function largestImage(images?: RawImage[]): string | null {
 	);
 }
 
-function albumRow(album: RawAlbum): AlbumRow {
+export function albumRow(album: RawAlbum): AlbumRow {
 	return {
 		id: album.id,
 		upc: album.external_ids?.upc ?? null,
@@ -120,7 +120,7 @@ function albumRow(album: RawAlbum): AlbumRow {
 	};
 }
 
-function trackRow(
+export function trackRow(
 	track: RawTrack & { id: string },
 	albumId: string | null,
 ): TrackRow {

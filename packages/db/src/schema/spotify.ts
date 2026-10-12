@@ -123,3 +123,15 @@ export const exportCursor = pgTable(
 	},
 	(table) => [uniqueIndex("export_cursor_key_idx").on(table.key)],
 );
+
+// Spotify "Download your data" uploads (#12): parsed in the browser, processed by spotify.import.
+export const dataImport = pgTable("data_import", {
+	id: serial("id").primaryKey(),
+	payload: jsonb("payload").notNull(),
+	status: text("status")
+		.$type<"queued" | "done" | "failed">()
+		.notNull()
+		.default("queued"),
+	summary: jsonb("summary").$type<Record<string, unknown>>(),
+	uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+});
