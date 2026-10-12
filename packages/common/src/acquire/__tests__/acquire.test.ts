@@ -174,4 +174,30 @@ describe("acquireRecording", () => {
 			"/staging/review/r1/maybe.flac",
 		);
 	});
+
+	it("lets the picker reorder fuzzy batches and raise the chosen one's confidence", async () => {
+		const slskd = fakeProvider("slskd", "C", [
+			{ ref: "live", matchConfidence: 0.8 },
+			{ ref: "studio", matchConfidence: 0.78 },
+		]);
+		const seen: string[] = [];
+		const { deps: d, placed } = await deps([slskd], () => ok);
+		const outcome = await acquireRecording(target, {
+			...d,
+			verify: async (_p, c) => {
+				seen.push(`${c.ref}@${c.matchConfidence}`);
+				return c.matchConfidence >= 0.9
+					? ok
+					: ({ ok: false, reason: "low_confidence" } as VerifyResult);
+			},
+			pick: async () => ({
+				choice: 1,
+				confidence: 0.94,
+				reason: "album folder",
+			}),
+		});
+		expect(outcome.status).toBe("placed");
+		expect(seen).toEqual(["studio@0.94"]);
+		expect(placed).toEqual(["studio"]);
+	});
 });

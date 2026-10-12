@@ -3,6 +3,7 @@ import { logger, task } from "@trigger.dev/sdk";
 
 import { acquireRecording } from "../../acquire/acquire";
 import { diskGuard } from "../../acquire/disk";
+import { groqPickAsk } from "../../acquire/llm";
 import {
 	createPlacer,
 	loadAcquireJob,
@@ -35,9 +36,10 @@ export const acquireRecordingTask = task({
 	run: async (payload: AcquirePayload) => {
 		const job = await loadAcquireJob(payload.recordingId);
 		if (!job) return { status: "gone" as const };
-		const [providers, acoustid] = await Promise.all([
+		const [providers, acoustid, groq] = await Promise.all([
 			configuredProviders(),
 			getCredentials("acoustid"),
+			getCredentials("groq"),
 		]);
 		const lookup = acoustid ? createAcoustidClient(acoustid.apiKey) : null;
 		const placeOptions = {
@@ -66,6 +68,7 @@ export const acquireRecordingTask = task({
 					lookup ? { lookupFingerprint: (fp) => lookup.lookup(fp) } : {},
 				),
 			place: createPlacer(job, placeOptions),
+			pick: groq ? groqPickAsk(groq.apiKey) : undefined,
 			keepForReview: (path) =>
 				moveToReview(env.LYTERION_STAGING_DIR, payload.recordingId, path),
 		});

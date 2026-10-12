@@ -25,11 +25,13 @@
 		}
 	},
 	"dependencies": {
+		"@lyterion/ai-provider": "workspace:*",
 		"@lyterion/core": "workspace:*",
 		"@lyterion/db": "workspace:*",
 		"@lyterion/env": "workspace:*",
 		"@lyterion/logger": "workspace:*",
 		"@trigger.dev/sdk": "catalog:",
+		"ai": "catalog:",
 		"drizzle-orm": "catalog:",
 		"zod": "catalog:"
 	},

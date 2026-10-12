@@ -8,6 +8,7 @@ import type {
 	RecordingTarget,
 } from "../providers/types";
 import type { VerifyResult } from "../verify/index";
+import { applyPick, type PickAsk, pickCandidate } from "./picker";
 
 // One recording: search, then fetch → verify → place down the ranked list (docs/pipeline.md § Failure handling).
 const MAX_ATTEMPTS = 5;
@@ -45,6 +46,8 @@ export type AcquireDeps = {
 		candidate: Candidate,
 		verify: VerifiedOk,
 	) => Promise<string>;
+	/** LLM picker for batches with no exact ISRC hit (D-011); without it the ranking stands. */
+	pick?: PickAsk;
 	/** Moves a near miss somewhere the review queue can play it; without it near misses are deleted. */
 	keepForReview?: (path: string, candidate: Candidate) => Promise<string>;
 	reliability?: Map<ProviderId, number>;
@@ -105,7 +108,22 @@ export async function acquireRecording(
 		errors.push(...search.errors.map((e) => `${e.providerId}: ${e.error}`));
 		const stopped = PHASE_ORDER.indexOf(search.stoppedAfterPhase);
 		remaining = remaining.filter((p) => PHASE_ORDER.indexOf(p.phase) > stopped);
-		const batch = rankCandidates(search.candidates, deps.reliability).map(
+		let ranked = rankCandidates(search.candidates, deps.reliability);
+		if (
+			deps.pick &&
+			ranked.length > 0 &&
+			!ranked.some((c) => c.isrcMatch && c.matchConfidence >= 1)
+		) {
+			try {
+				ranked = applyPick(
+					ranked,
+					await pickCandidate(target, ranked, deps.pick),
+				);
+			} catch (error) {
+				errors.push(`picker: ${message(error)}`);
+			}
+		}
+		const batch = ranked.map(
 			(candidate, i): AttemptLog => ({
 				candidate,
 				rank: attempts.length + i,
