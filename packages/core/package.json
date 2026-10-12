@@ -13,7 +13,8 @@
 	"dependencies": {
 		"@lyterion/auth": "workspace:*",
 		"@lyterion/db": "workspace:*",
-		"@lyterion/env": "workspace:*"
+		"@lyterion/env": "workspace:*",
+		"drizzle-orm": "catalog:"
 	},
 	"devDependencies": {
 		"@lyterion/config": "workspace:*",
