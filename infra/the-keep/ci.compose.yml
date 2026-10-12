@@ -3,7 +3,7 @@
 
 services:
   runner:
-    image: myoung34/github-runner:2.330.0
+    image: myoung34/github-runner:2.338.0
     restart: unless-stopped
     environment:
       REPO_URL: https://github.com/FindMalek/lyterion
@@ -13,7 +13,6 @@ services:
       LABELS: the-keep
       # Any EPHEMERAL value, even "false", turns ephemeral mode on in this image, so it is left unset.
       DISABLE_AUTOMATIC_DEREGISTRATION: "true"
-      DISABLE_AUTO_UPDATE: "true"
       RUNNER_WORKDIR: /tmp/runner/work
       # Keeps the registration across restarts, so the 1h registration token is only needed once.
       CONFIGURED_ACTIONS_RUNNER_FILES_DIR: /runner/data
