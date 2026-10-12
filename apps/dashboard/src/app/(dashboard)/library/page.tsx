@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { DuplicatesTable } from "@/components/app/duplicates-table";
 import { LibraryTable } from "@/components/app/library-table";
+import { ReconcilePlan } from "@/components/app/reconcile-plan";
 import { PageHeader } from "@/components/shared/page-header";
 
 export default async function LibraryPage({
@@ -11,6 +12,9 @@ export default async function LibraryPage({
 }) {
 	const { view } = await searchParams;
 	const duplicates = view === "duplicates";
+	const reconcile = view === "reconcile";
+	const tab = (active: boolean) =>
+		active ? "" : "text-muted-foreground hover:text-foreground";
 	return (
 		<>
 			<PageHeader
@@ -18,26 +22,25 @@ export default async function LibraryPage({
 				description="every recording and the file that holds it"
 				actions={
 					<div className="flex gap-3 font-mono text-xs">
-						<Link
-							href="/library"
-							className={
-								duplicates ? "text-muted-foreground hover:text-foreground" : ""
-							}
-						>
+						<Link href="/library" className={tab(!duplicates && !reconcile)}>
 							tracks
 						</Link>
-						<Link
-							href="/library?view=duplicates"
-							className={
-								duplicates ? "" : "text-muted-foreground hover:text-foreground"
-							}
-						>
+						<Link href="/library?view=duplicates" className={tab(duplicates)}>
 							duplicates
+						</Link>
+						<Link href="/library?view=reconcile" className={tab(reconcile)}>
+							reconcile
 						</Link>
 					</div>
 				}
 			/>
-			{duplicates ? <DuplicatesTable /> : <LibraryTable />}
+			{duplicates ? (
+				<DuplicatesTable />
+			) : reconcile ? (
+				<ReconcilePlan />
+			) : (
+				<LibraryTable />
+			)}
 		</>
 	);
 }

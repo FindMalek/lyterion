@@ -20,6 +20,9 @@
 		"./dashboard": {
 			"default": "./src/dashboard/queries.ts"
 		},
+		"./reconcile": {
+			"default": "./src/reconcile/plan.ts"
+		},
 		"./review": {
 			"default": "./src/review/persist.ts"
 		},
