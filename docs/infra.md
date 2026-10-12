@@ -51,12 +51,16 @@ api runs migrations on start (D-035).
 
 Done once. Items marked **Malek** need credentials only Malek has.
 
-1. **DNS on Vercel:** A records pointing at the Tailscale IP `100.83.223.27`
-   - `*.preview.findmalek.engineer`
-   - `lyterion.findmalek.engineer`
-   - `api.lyterion.findmalek.engineer`
-2. **Garage:** create bucket `turbo-cache` and an access key with
-   read/write on it.
+1. ✅ **DNS on Vercel** (2026-10-12): CNAMEs to `tailnet.findmalek.engineer`,
+   same as the other tailnet-only services:
+   - `*.preview`
+   - `lyterion`
+   - `api.lyterion`
+2. ✅ **Garage** (2026-10-12): bucket `turbo-cache`, key `turbo-cache-key`
+   (`GK33cfbd398235968317dde9ad`, RWO). The secret is in
+   `~/.lyterion-turbo-key.txt` on `the-keep` (mode 600). Endpoint:
+   `http://infrastructure-garage-lqdycf-garage-1:3900` on `dokploy-network`,
+   region `garage`.
 3. **Malek, GitHub PAT for the runner:** fine-grained, repo
    `FindMalek/lyterion`, Administration read/write. Goes in
    `GITHUB_RUNNER_PAT`.

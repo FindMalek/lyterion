@@ -1,5 +1,5 @@
 # Dokploy compose service "lyterion-ci" on the-keep (D-036): GitHub runner + turbo remote cache.
-# Env (set in Dokploy, never committed): GITHUB_RUNNER_PAT, TURBO_TOKEN, GARAGE_ACCESS_KEY, GARAGE_SECRET_KEY, GARAGE_ENDPOINT
+# Env (set in Dokploy, never committed): GITHUB_RUNNER_PAT, TURBO_TOKEN, GARAGE_ACCESS_KEY, GARAGE_SECRET_KEY, GARAGE_ENDPOINT=http://infrastructure-garage-lqdycf-garage-1:3900
 
 services:
   runner:
