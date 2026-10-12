@@ -14,6 +14,12 @@ import {
 import { spotifyTrack } from "@lyterion/db/schema/spotify";
 import { and, eq, inArray, max, sql } from "drizzle-orm";
 
+import {
+	fetchLyrics,
+	measureLoudness,
+	replayGainTags,
+	writeLyrics,
+} from "../library/extras";
 import { libraryRelativePath } from "../library/layout";
 import {
 	downsampleToCap,
@@ -191,10 +197,25 @@ export function createPlacer(job: AcquireJob, options: PlaceOptions) {
 			lyterionRecordingId: target.recordingId,
 			spotifyTrackId: target.spotifyTrackId,
 		});
-		return placeFile(
-			{ stagedPath: staged, relativePath, tags, coverPath },
+		// Loudness and lyrics are extras: a failure here never blocks placing the file (#45).
+		const loudness = await measureLoudness(staged).catch(() => null);
+		const placed = await placeFile(
+			{
+				stagedPath: staged,
+				relativePath,
+				tags: loudness ? { ...tags, ...replayGainTags(loudness) } : tags,
+				coverPath,
+			},
 			options,
 		);
+		const lyrics = await fetchLyrics({
+			artist: target.artists[0] ?? "",
+			title: target.title,
+			album: placement.album,
+			durationMs: target.durationMs,
+		}).catch(() => null);
+		if (lyrics) await writeLyrics(placed, lyrics).catch(() => undefined);
+		return placed;
 	};
 }
 
