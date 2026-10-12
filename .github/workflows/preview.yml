@@ -1,5 +1,5 @@
-# Vercel-style previews on the-keep (D-036): images per PR, Dokploy apps + Postgres, sticky comment.
-# Skipped until vars.DOKPLOY_URL is set, see docs/infra.md#previews.
+# Vercel-style previews on Dokploy (D-036, D-037), built on GitHub runners: images per PR, Dokploy apps + Postgres, sticky comment.
+# Skipped until vars.DEPLOY_ENABLED is "true", see docs/infra.md#previews.
 
 name: Preview
 
@@ -19,15 +19,15 @@ permissions:
 env:
   PR_NUMBER: ${{ github.event.pull_request.number }}
   PREVIEW_DOMAIN: ${{ vars.PREVIEW_DOMAIN }}
-  DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+  DOKPLOY_URL: ${{ vars.DOKPLOY_PUBLIC_URL }}
   DOKPLOY_PUBLIC_URL: ${{ vars.DOKPLOY_PUBLIC_URL }}
   DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
   GITHUB_TOKEN: ${{ github.token }}
 
 jobs:
   deploy:
-    if: github.event.action != 'closed' && vars.DOKPLOY_URL != '' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: the-keep
+    if: github.event.action != 'closed' && vars.DOKPLOY_PUBLIC_URL != '' && vars.DEPLOY_ENABLED == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -63,6 +63,8 @@ jobs:
             TURBO_TEAM=${{ vars.TURBO_TEAM }}
           secrets: |
             turbo_token=${{ secrets.TURBO_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build dashboard
         uses: docker/build-push-action@v6
@@ -79,12 +81,18 @@ jobs:
             TURBO_TEAM=${{ vars.TURBO_TEAM }}
           secrets: |
             turbo_token=${{ secrets.TURBO_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Deploy preview
         env:
-          GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
-          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
-          PREVIEW_APP_ENV: ${{ secrets.PREVIEW_APP_ENV }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_READ_TOKEN: ${{ github.token }}
+          PREVIEW_APP_ENV: |
+            LYTERION_BETTER_AUTH_SECRET=${{ secrets.LYTERION_BETTER_AUTH_SECRET }}
+            LYTERION_SPOTIFY_CLIENT_ID=${{ secrets.LYTERION_SPOTIFY_CLIENT_ID }}
+            LYTERION_SPOTIFY_CLIENT_SECRET=${{ secrets.LYTERION_SPOTIFY_CLIENT_SECRET }}
+            LYTERION_AUTH_PRODUCTION_URL=https://${{ vars.PRODUCTION_API_HOST }}
         run: node scripts/deploy/dokploy.mjs preview-up
 
       - name: Mark failed
@@ -92,8 +100,8 @@ jobs:
         run: node scripts/deploy/dokploy.mjs comment-failed
 
   cleanup:
-    if: github.event.action == 'closed' && vars.DOKPLOY_URL != '' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: the-keep
+    if: github.event.action == 'closed' && vars.DOKPLOY_PUBLIC_URL != '' && vars.DEPLOY_ENABLED == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout

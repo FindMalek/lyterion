@@ -1,54 +1,7 @@
-# Dokploy compose "lyterion-ci" on the-keep (D-036), deployed by .github/workflows/infra.yml.
-# Env comes from repo secrets through scripts/deploy/dokploy.mjs ci-infra, never committed.
+# Dokploy compose "lyterion-ci" on the-keep (D-036, D-037): only the turbo remote cache, CI runs on GitHub.
+# Deployed by .github/workflows/infra.yml, env comes from repo secrets and is never committed.
 
-x-runner: &runner
-    image: myoung34/github-runner:2.338.0
-    restart: unless-stopped
-    environment: &runner-env
-      REPO_URL: https://github.com/FindMalek/lyterion
-      RUNNER_SCOPE: repo
-      RUNNER_TOKEN: ${RUNNER_TOKEN}
-      LABELS: the-keep
-      # Any EPHEMERAL value, even "false", turns ephemeral mode on in this image, so it is left unset.
-      DISABLE_AUTOMATIC_DEREGISTRATION: "true"
-      RUNNER_WORKDIR: /tmp/runner/work
-      # Keeps the registration across restarts, so the 1h registration token is only needed once.
-      CONFIGURED_ACTIONS_RUNNER_FILES_DIR: /runner/data
-    networks:
-      - dokploy-network
-
-# Every runner mounts the docker socket = root on the host, acceptable only because the repo is private (D-036).
 services:
-  runner:
-    <<: *runner
-    environment:
-      <<: *runner-env
-      RUNNER_NAME: the-keep
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/runner:/tmp/runner
-      - runner-data:/runner/data
-
-  runner-2:
-    <<: *runner
-    environment:
-      <<: *runner-env
-      RUNNER_NAME: the-keep-2
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/runner-2:/tmp/runner
-      - runner-2-data:/runner/data
-
-  runner-3:
-    <<: *runner
-    environment:
-      <<: *runner-env
-      RUNNER_NAME: the-keep-3
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/runner-3:/tmp/runner
-      - runner-3-data:/runner/data
-
   turbo-cache:
     image: ducktors/turborepo-remote-cache:2.6.1
     restart: unless-stopped
@@ -65,11 +18,6 @@ services:
       dokploy-network:
         aliases:
           - turbo-cache
-
-volumes:
-  runner-data:
-  runner-2-data:
-  runner-3-data:
 
 networks:
   dokploy-network:

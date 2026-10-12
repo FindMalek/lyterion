@@ -1,5 +1,4 @@
-# Deploys the CI infra compose (runner + turbo cache) to Dokploy from a GitHub hosted runner (D-036).
-# Run it manually after refreshing secrets.RUNNER_TOKEN (1h registration token), see docs/infra.md.
+# Deploys the turbo cache compose to Dokploy from a GitHub hosted runner (D-036, D-037), run manually.
 
 name: Infra
 
@@ -23,7 +22,6 @@ jobs:
         env:
           DOKPLOY_URL: ${{ vars.DOKPLOY_PUBLIC_URL || 'https://dokploy.findmalek.engineer' }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          RUNNER_TOKEN: ${{ secrets.RUNNER_TOKEN }}
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           GARAGE_ACCESS_KEY: ${{ secrets.GARAGE_ACCESS_KEY }}
           GARAGE_SECRET_KEY: ${{ secrets.GARAGE_SECRET_KEY }}

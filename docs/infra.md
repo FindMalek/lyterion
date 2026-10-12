@@ -1,4 +1,8 @@
-# Infra: CI, cache, previews, production (D-036)
+# Infra: CI, cache, previews, production (D-036, D-037)
+
+> D-037: CI and all image builds run on GitHub-hosted runners. `the-keep`
+> only hosts the apps and the turbo cache (`turbo.findmalek.engineer`). The
+> runner rows and steps below are historical.
 
 Everything runs on `the-keep`. Nothing here is live until the setup steps
 below are done. Until then the workflows skip themselves or fall back to
