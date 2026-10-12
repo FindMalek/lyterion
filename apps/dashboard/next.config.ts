@@ -1,7 +1,10 @@
+import path from "node:path";
 import "@lyterion/env/dashboard";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+	output: "standalone",
+	outputFileTracingRoot: path.join(import.meta.dirname, "../.."),
 	typedRoutes: true,
 	reactCompiler: true,
 	allowedDevOrigins: ["127.0.0.1"],

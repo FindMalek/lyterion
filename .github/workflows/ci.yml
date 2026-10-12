@@ -1,12 +1,10 @@
-# Runs on every push/PR: install, lint, typecheck+build, and test — in parallel jobs
-# so a failure in one (e.g. lint) doesn't block visibility into the others.
-#
-# build/test use Turborepo's remote cache (Vercel) when TURBO_TOKEN is set, so
-# unchanged packages skip re-building/re-testing entirely. Requires:
-#   - repo secret TURBO_TOKEN: a Vercel access token (vercel.com/account/tokens)
-#   - repo variable TURBO_TEAM: findmalek-team
-# Without them, turbo silently falls back to no remote cache (still correct,
-# just slower — every run rebuilds from scratch).
+# Runs on every push/PR: lint, typecheck+build and test as parallel jobs.
+# Runner and turbo remote cache live on the-keep (D-036). Until vars.CI_RUNNER is set
+# jobs fall back to GitHub runners, and turbo falls back to no remote cache.
+#   vars.CI_RUNNER: the-keep
+#   vars.TURBO_API: http://turbo-cache:3000 (dokploy network)
+#   vars.TURBO_TEAM: lyterion
+#   secrets.TURBO_TOKEN: the cache server's TURBO_TOKEN
 
 name: CI
 
@@ -17,7 +15,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +42,7 @@ jobs:
         run: node scripts/check-comment-blocks.mjs "origin/${{ github.event.pull_request.base.ref || 'main' }}"
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     env:
       # SKIP_ENV_VALIDATION skips the zod check, but some routes still read these during static generation.
       SKIP_ENV_VALIDATION: "true"
@@ -54,6 +52,7 @@ jobs:
       LYTERION_BETTER_AUTH_SECRET: "ci-build-only-placeholder-not-a-real-secret-32"
       LYTERION_SPOTIFY_CLIENT_ID: "ci-build-only-placeholder"
       LYTERION_SPOTIFY_CLIENT_SECRET: "ci-build-only-placeholder"
+      TURBO_API: ${{ vars.TURBO_API }}
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
       TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     steps:
@@ -77,9 +76,10 @@ jobs:
         run: pnpm build
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     env:
       SKIP_ENV_VALIDATION: "true"
+      TURBO_API: ${{ vars.TURBO_API }}
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
       TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     steps:
