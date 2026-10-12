@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-// Every service the owner can configure from the dashboard. The api sends these field specs to the
-// dashboard, so a new kind only needs an entry here.
+// Every service the owner can set from the dashboard; the api sends these specs, so a new kind is one entry.
 export type CredentialField = {
 	name: string;
 	label: string;
