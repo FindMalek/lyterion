@@ -23,10 +23,14 @@
 		"build": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@lyterion/common": "workspace:*",
+		"@lyterion/core": "workspace:*",
+		"@lyterion/db": "workspace:*",
+		"@lyterion/env": "workspace:*",
 		"@orpc/client": "catalog:",
 		"@orpc/server": "catalog:",
 		"@orpc/zod": "catalog:",
-		"@lyterion/core": "workspace:*",
+		"drizzle-orm": "catalog:",
 		"zod": "catalog:"
 	},
 	"devDependencies": {

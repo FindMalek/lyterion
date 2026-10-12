@@ -1,8 +1,12 @@
 import type { RouterClient } from "@orpc/server";
 
 import { protectedProcedure, publicProcedure } from "../procedures";
+import { connectionsRouter } from "./connections";
+import { runsRouter } from "./runs";
 
 export const appRouter = {
+	connections: connectionsRouter,
+	runs: runsRouter,
 	health: publicProcedure.handler(() => ({ ok: true as const })),
 	me: protectedProcedure.handler(({ context }) => ({
 		id: context.session.user.id,

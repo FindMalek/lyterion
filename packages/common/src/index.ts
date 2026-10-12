@@ -1,3 +1,4 @@
+export * from "./health/connections";
 export * from "./identity/group";
 export * from "./identity/musicbrainz";
 export * from "./identity/normalize";
