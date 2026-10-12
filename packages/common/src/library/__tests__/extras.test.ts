@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { fetchLyrics, lrcPath, parseEbur128, replayGainTags } from "../extras";
+import {
+	albumLoudnessArgs,
+	fetchLyrics,
+	lrcPath,
+	parseEbur128,
+	replayGainTags,
+} from "../extras";
 
 const STDERR = `[Parsed_ebur128_0 @ 0x1] t: 1.0  M: -20.1 S:-120.7 I: -20.1 LUFS LRA: 0.0 LU
 [Parsed_ebur128_0 @ 0x1] Summary:
@@ -49,5 +55,27 @@ describe("lyrics", () => {
 		expect(await fetchLyrics(q, reply({ instrumental: true }))).toBeNull();
 		expect(await fetchLyrics(q, reply({}, 404))).toBeNull();
 		expect(lrcPath("/m/a/01 Teardrop.flac")).toBe("/m/a/01 Teardrop.lrc");
+	});
+});
+
+describe("album gain", () => {
+	it("concatenates every track, resampled, before ebur128", () => {
+		expect(albumLoudnessArgs(["a.flac", "b.mp3"])).toEqual([
+			"-i",
+			"a.flac",
+			"-i",
+			"b.mp3",
+			"-filter_complex",
+			"[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];[1:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];[a0][a1]concat=n=2:v=0:a=1,ebur128=peak=true",
+		]);
+	});
+
+	it("writes album keys", () => {
+		expect(
+			replayGainTags({ integratedLufs: -25, truePeakDb: -13.5 }, "ALBUM"),
+		).toEqual({
+			REPLAYGAIN_ALBUM_GAIN: ["7.00 dB"],
+			REPLAYGAIN_ALBUM_PEAK: ["0.211349"],
+		});
 	});
 });

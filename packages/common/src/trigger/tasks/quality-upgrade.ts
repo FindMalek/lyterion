@@ -9,6 +9,7 @@ import { groqPickAsk } from "../../acquire/llm";
 import { createPlacer, loadAcquireJob } from "../../acquire/persist";
 import { configuredProviders } from "../../credentials/providers";
 import { getCredentials } from "../../credentials/store";
+import { albumGainAfterPlace } from "../../library/album-gain";
 import { createNavidromeClient } from "../../navidrome/client";
 import { createNotifier } from "../../notify/ntfy";
 import type { Provider } from "../../providers/types";
@@ -133,6 +134,7 @@ export async function runUpgrade(fileIds?: number[]) {
 			});
 			if (client && file.navidromeSongId)
 				await clearSignal(client, file.navidromeSongId, file.upgradeSignal);
+			await albumGainAfterPlace(file.releaseId, env.LYTERION_PYTHON);
 			await requestScan();
 			await notifier.notify({
 				kind: "upgrade",

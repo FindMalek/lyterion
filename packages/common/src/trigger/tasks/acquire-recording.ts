@@ -13,6 +13,7 @@ import {
 } from "../../acquire/persist";
 import { configuredProviders } from "../../credentials/providers";
 import { getCredentials } from "../../credentials/store";
+import { albumGainAfterPlace } from "../../library/album-gain";
 import {
 	notifyOwner,
 	notifyReviewNeeded,
@@ -92,7 +93,14 @@ export async function acquireOne(
 	}
 
 	await recordOutcome(job, outcome);
-	if (outcome.status === "placed") await requestScan();
+	if (outcome.status === "placed") {
+		const albumGain = await albumGainAfterPlace(
+			job.placement.releaseId,
+			env.LYTERION_PYTHON,
+		);
+		if (albumGain?.status === "written") logger.info("album gain", albumGain);
+		await requestScan();
+	}
 	if (outcome.status === "review")
 		await notifyReviewNeeded().catch(() => false);
 	const progress = await incrementStage(

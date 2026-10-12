@@ -23,27 +23,53 @@ export function parseEbur128(stderr: string): Loudness | null {
 	};
 }
 
-export function replayGainTags(loudness: Loudness): Record<string, string[]> {
+export function replayGainTags(
+	loudness: Loudness,
+	scope: "TRACK" | "ALBUM" = "TRACK",
+): Record<string, string[]> {
 	const gain = RG_REFERENCE_LUFS - loudness.integratedLufs;
 	const peak = Number.isFinite(loudness.truePeakDb)
 		? 10 ** (loudness.truePeakDb / 20)
 		: 0;
 	return {
-		REPLAYGAIN_TRACK_GAIN: [`${gain.toFixed(2)} dB`],
-		REPLAYGAIN_TRACK_PEAK: [peak.toFixed(6)],
+		[`REPLAYGAIN_${scope}_GAIN`]: [`${gain.toFixed(2)} dB`],
+		[`REPLAYGAIN_${scope}_PEAK`]: [peak.toFixed(6)],
 	};
 }
 
 export async function measureLoudness(path: string): Promise<Loudness | null> {
+	return measureAlbumLoudness([path]);
+}
+
+// Album gain is the loudness of the tracks played back to back; inputs are resampled so concat accepts mixed formats.
+export function albumLoudnessArgs(paths: string[]): string[] {
+	if (paths.length === 1)
+		return ["-i", paths[0] as string, "-af", "ebur128=peak=true"];
+	const inputs = paths.flatMap((p) => ["-i", p]);
+	const prepared = paths
+		.map(
+			(_, i) =>
+				`[${i}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[a${i}]`,
+		)
+		.join(";");
+	const joined = paths.map((_, i) => `[a${i}]`).join("");
+	return [
+		...inputs,
+		"-filter_complex",
+		`${prepared};${joined}concat=n=${paths.length}:v=0:a=1,ebur128=peak=true`,
+	];
+}
+
+export async function measureAlbumLoudness(
+	paths: string[],
+): Promise<Loudness | null> {
+	if (paths.length === 0) return null;
 	const { stderr } = await run(
 		"ffmpeg",
 		[
 			"-hide_banner",
 			"-nostats",
-			"-i",
-			path,
-			"-af",
-			"ebur128=peak=true",
+			...albumLoudnessArgs(paths),
 			"-f",
 			"null",
 			"-",

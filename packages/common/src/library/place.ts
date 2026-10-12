@@ -106,6 +106,7 @@ export function writeTags(
 	tags: TagMap,
 	cover: string | null,
 	python = "python3",
+	merge = false,
 ): Promise<void> {
 	return resolveWriteTagsScript().then(
 		(script) =>
@@ -123,7 +124,7 @@ export function writeTags(
 					else
 						reject(new Error(`write_tags failed (${code}): ${stderr.trim()}`));
 				});
-				child.stdin.end(JSON.stringify({ path, tags, cover }));
+				child.stdin.end(JSON.stringify({ path, tags, cover, merge }));
 			}),
 	);
 }

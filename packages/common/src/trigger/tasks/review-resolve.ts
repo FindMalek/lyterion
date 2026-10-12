@@ -10,6 +10,7 @@ import {
 	recordOutcome,
 } from "../../acquire/persist";
 import { configuredProviders } from "../../credentials/providers";
+import { albumGainAfterPlace } from "../../library/album-gain";
 import type { AudioFormat, Candidate, ProviderId } from "../../providers/types";
 import {
 	discardStaged,
@@ -98,6 +99,7 @@ export const reviewResolveTask = task({
 		await recordOutcome(job, outcome);
 		await resolveReview(reviewId, `picked:${candidateId}`);
 		await discardStaged(review.recordingId);
+		await albumGainAfterPlace(job.placement.releaseId, env.LYTERION_PYTHON);
 		await requestScan();
 		logger.info("review resolved", { reviewId, candidateId, path });
 		return { path };
