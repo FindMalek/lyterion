@@ -34,7 +34,10 @@ export function toMessage(event: NotifyEvent): NtfyMessage {
 		case "review_needed":
 			return {
 				title: "Lyterion needs review",
-				message: `${event.count} track${event.count === 1 ? "" : "s"} need review`,
+				message:
+					event.count === 1
+						? "1 track needs review"
+						: `${event.count} tracks need review`,
 				tags: ["mag"],
 				priority: 3,
 			};

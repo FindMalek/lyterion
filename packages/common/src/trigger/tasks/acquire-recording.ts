@@ -14,6 +14,11 @@ import {
 import { configuredProviders } from "../../credentials/providers";
 import { getCredentials } from "../../credentials/store";
 import {
+	notifyOwner,
+	notifyReviewNeeded,
+	runSummary,
+} from "../../notify/owner";
+import {
 	claimStage,
 	finishRun,
 	incrementStage,
@@ -82,6 +87,8 @@ export const acquireRecordingTask = task({
 
 		await recordOutcome(job, outcome);
 		if (outcome.status === "placed") await requestScan();
+		if (outcome.status === "review")
+			await notifyReviewNeeded().catch(() => false);
 		const progress = await incrementStage(
 			payload.runId,
 			ACQUIRE_STAGE,
@@ -93,6 +100,12 @@ export const acquireRecordingTask = task({
 		) {
 			await finishRun(payload.runId, "done");
 			await navidromeScanTask.trigger({ force: true });
+			const summary = await runSummary();
+			await notifyOwner({
+				kind: "run_finished",
+				summary: summary.text,
+				failed: summary.failed,
+			}).catch(() => undefined);
 		}
 		logger.info("acquire done", {
 			status: outcome.status,
