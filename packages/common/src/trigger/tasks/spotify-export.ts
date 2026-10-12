@@ -3,10 +3,12 @@ import { account, user } from "@lyterion/db/schema/auth";
 import { logger, task } from "@trigger.dev/sdk";
 import { and, eq } from "drizzle-orm";
 
+import { claimStage, finishRun } from "../../pipeline/advance";
 import { updateStageProgress } from "../../pipeline/progress";
 import { createSpotifyClient } from "../../spotify/client";
 import { exportLibrary } from "../../spotify/export";
 import { persistExport, saveExportPage } from "../../spotify/persist";
+import { identityResolveTask } from "./identity-resolve";
 
 const STAGE = "spotify.export";
 
@@ -79,12 +81,15 @@ export const spotifyExportTask = task({
 				failed: 0,
 				finishedAt: new Date().toISOString(),
 			});
+			if (await claimStage(runId, "identity.resolve"))
+				await identityResolveTask.trigger({ runId });
 			return summary;
 		} catch (err) {
 			await updateStageProgress(runId, STAGE, {
 				status: "failed",
 				finishedAt: new Date().toISOString(),
 			});
+			await finishRun(runId, "failed");
 			throw err;
 		}
 	},

@@ -11,6 +11,9 @@
 		".": {
 			"default": "./src/index.ts"
 		},
+		"./pipeline/start": {
+			"default": "./src/pipeline/start.ts"
+		},
 		"./credentials": {
 			"default": "./src/credentials/index.ts"
 		},

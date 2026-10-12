@@ -8,7 +8,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@lyterion/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	formatDateTime,
 	formatDuration,
@@ -25,11 +25,37 @@ export function RunsTable() {
 		refetchInterval: 5_000,
 		meta: { silent: true },
 	});
+	const queryClient = useQueryClient();
+	const start = useMutation({
+		...orpc.runs.start.mutationOptions(),
+		onSuccess: () =>
+			queryClient.invalidateQueries({ queryKey: orpc.runs.list.key() }),
+	});
+	const running = data?.some((run) => run.status === "running") ?? false;
 
 	return (
 		<section>
-			<div className="flex h-8 items-center border-b px-3">
+			<div className="flex h-8 items-center justify-between gap-3 border-b px-3">
 				<h2 className="font-medium text-xs uppercase tracking-wide">Runs</h2>
+				<div className="flex min-w-0 items-center gap-3">
+					{start.error && (
+						<span className="truncate font-mono text-destructive text-xs">
+							{start.error.message}
+						</span>
+					)}
+					<button
+						type="button"
+						disabled={running || start.isPending}
+						onClick={() => start.mutate({})}
+						className="shrink-0 font-mono text-xs hover:text-foreground disabled:text-muted-foreground/50"
+					>
+						{start.isPending
+							? "starting…"
+							: running
+								? "running"
+								: "start run →"}
+					</button>
+				</div>
 			</div>
 			{data && data.length === 0 ? (
 				<p className="px-3 py-3 text-muted-foreground text-xs">

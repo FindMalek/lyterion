@@ -1,0 +1,174 @@
+import {
+	boolean,
+	doublePrecision,
+	index,
+	integer,
+	pgTable,
+	primaryKey,
+	serial,
+	text,
+	timestamp,
+	uniqueIndex,
+} from "drizzle-orm/pg-core";
+
+// Identity and acquisition, docs/data-model.md § Identity and § Acquisition.
+export type RecordingStatus =
+	| "pending"
+	| "resolved"
+	| "searching"
+	| "fetching"
+	| "verifying"
+	| "placed"
+	| "linked"
+	| "missing"
+	| "review"
+	| "skipped"
+	| "existing";
+
+export const recording = pgTable(
+	"recording",
+	{
+		id: text("id").primaryKey(),
+		title: text("title").notNull(),
+		artists: text("artists").array().notNull().default([]),
+		versionFlags: text("version_flags").array().notNull().default([]),
+		durationMs: integer("duration_ms").notNull(),
+		isrcs: text("isrcs").array().notNull().default([]),
+		mbRecordingId: text("mb_recording_id"),
+		preferredSpotifyTrackId: text("preferred_spotify_track_id").notNull(),
+		status: text("status")
+			.$type<RecordingStatus>()
+			.notNull()
+			.default("pending"),
+		placedReleaseIds: text("placed_release_ids").array().notNull().default([]),
+		generation: integer("generation").notNull().default(0),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => [index("recording_status_idx").on(table.status)],
+);
+
+export const recordingMember = pgTable(
+	"recording_member",
+	{
+		spotifyTrackId: text("spotify_track_id").primaryKey(),
+		recordingId: text("recording_id")
+			.notNull()
+			.references(() => recording.id, { onDelete: "cascade" }),
+		edge: text("edge")
+			.$type<"self" | "isrc" | "mb" | "fuzzy" | "fingerprint" | "manual">()
+			.notNull(),
+	},
+	(table) => [index("recording_member_recording_idx").on(table.recordingId)],
+);
+
+export const release = pgTable("release", {
+	id: text("id").primaryKey(),
+	spotifyAlbumId: text("spotify_album_id"),
+	mbReleaseId: text("mb_release_id"),
+	title: text("title").notNull(),
+	albumArtist: text("album_artist").notNull(),
+	type: text("type")
+		.$type<"album" | "ep" | "single" | "compilation">()
+		.notNull(),
+	releaseDate: text("release_date"),
+	isSaved: boolean("is_saved").notNull().default(false),
+	coverUrl: text("cover_url"),
+	totalTracks: integer("total_tracks"),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const releaseTrack = pgTable(
+	"release_track",
+	{
+		releaseId: text("release_id")
+			.notNull()
+			.references(() => release.id, { onDelete: "cascade" }),
+		recordingId: text("recording_id")
+			.notNull()
+			.references(() => recording.id, { onDelete: "cascade" }),
+		discNumber: integer("disc_number").notNull().default(1),
+		trackNumber: integer("track_number"),
+	},
+	(table) => [primaryKey({ columns: [table.releaseId, table.recordingId] })],
+);
+
+export const candidate = pgTable(
+	"candidate",
+	{
+		id: serial("id").primaryKey(),
+		recordingId: text("recording_id")
+			.notNull()
+			.references(() => recording.id, { onDelete: "cascade" }),
+		providerId: text("provider_id").notNull(),
+		ref: text("ref").notNull(),
+		format: text("format").notNull(),
+		bitrateKbps: integer("bitrate_kbps"),
+		bitDepth: integer("bit_depth"),
+		sampleRateHz: integer("sample_rate_hz"),
+		durationMs: integer("duration_ms"),
+		isrcMatch: boolean("isrc_match").notNull().default(false),
+		matchConfidence: doublePrecision("match_confidence").notNull(),
+		rank: integer("rank").notNull(),
+		state: text("state")
+			.$type<"new" | "fetching" | "failed" | "chosen">()
+			.notNull()
+			.default("new"),
+		failureReason: text("failure_reason"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => [
+		uniqueIndex("candidate_recording_ref_idx").on(
+			table.recordingId,
+			table.providerId,
+			table.ref,
+		),
+	],
+);
+
+export const libraryFile = pgTable(
+	"library_file",
+	{
+		id: serial("id").primaryKey(),
+		recordingId: text("recording_id").references(() => recording.id, {
+			onDelete: "set null",
+		}),
+		releaseId: text("release_id"),
+		path: text("path").notNull(),
+		owned: boolean("owned").notNull(),
+		codec: text("codec").notNull(),
+		bitrateKbps: integer("bitrate_kbps"),
+		bitDepth: integer("bit_depth"),
+		sampleRateHz: integer("sample_rate_hz"),
+		durationMs: integer("duration_ms").notNull(),
+		acoustidRecording: text("acoustid_recording"),
+		spectralCutoffHz: integer("spectral_cutoff_hz"),
+		verifiedLossless: boolean("verified_lossless").notNull().default(false),
+		sizeBytes: integer("size_bytes"),
+		sourceProvider: text("source_provider"),
+		sourceRef: text("source_ref"),
+		upgradeReason: text("upgrade_reason"),
+		upgradePriority: integer("upgrade_priority"),
+		navidromeSongId: text("navidrome_song_id"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => [
+		uniqueIndex("library_file_path_idx").on(table.path),
+		index("library_file_recording_idx").on(table.recordingId),
+	],
+);
+
+export const reviewItem = pgTable(
+	"review_item",
+	{
+		id: serial("id").primaryKey(),
+		recordingId: text("recording_id")
+			.notNull()
+			.references(() => recording.id, { onDelete: "cascade" }),
+		reason: text("reason").notNull(),
+		candidateIds: integer("candidate_ids").array().notNull().default([]),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		resolvedAt: timestamp("resolved_at"),
+		resolution: text("resolution"),
+	},
+	(table) => [index("review_item_open_idx").on(table.resolvedAt)],
+);
