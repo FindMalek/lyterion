@@ -32,6 +32,9 @@ the threshold.
 - Real CD-sourced FLAC has content up to ~20–22kHz.
 - MP3 320 cuts off around 19.5–20kHz, MP3 ≤ 256 around 16–19kHz.
 - A hard shelf below ~19.5kHz in multiple windows means a transcode.
+- Measured on generated noise: LAME 128 → 16.9 kHz, LAME 320 → 20.3 kHz,
+  full-band FLAC → 22 kHz. The threshold is 20.5 kHz, content level − 50 dB
+  (`packages/common/src/verify/index.ts`).
 
 Thresholds get tuned on known-good and known-bad samples. The result is
 stored as `verified_lossless: boolean`, and only true counts as lossless for
