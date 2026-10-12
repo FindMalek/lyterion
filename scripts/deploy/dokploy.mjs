@@ -17,7 +17,7 @@ function requireEnv(name) {
 
 const DOKPLOY_URL = requireEnv("DOKPLOY_URL").replace(/\/$/, "");
 const DOKPLOY_PUBLIC_URL = (
-	process.env.DOKPLOY_PUBLIC_URL ?? DOKPLOY_URL
+	process.env.DOKPLOY_PUBLIC_URL || DOKPLOY_URL
 ).replace(/\/$/, "");
 const DOKPLOY_API_KEY = requireEnv("DOKPLOY_API_KEY");
 
@@ -516,7 +516,7 @@ function ciInfra() {
 			GARAGE_SECRET_KEY: requireEnv("GARAGE_SECRET_KEY"),
 		},
 		domain: {
-			host: process.env.TURBO_PUBLIC_HOST ?? "turbo.findmalek.engineer",
+			host: process.env.TURBO_PUBLIC_HOST || "turbo.findmalek.engineer",
 			port: 3000,
 			serviceName: "turbo-cache",
 		},
@@ -536,7 +536,7 @@ const TRIGGER_GENERATED = [
 ];
 
 function triggerInfra() {
-	const host = process.env.TRIGGER_PUBLIC_HOST ?? "trigger.findmalek.engineer";
+	const host = process.env.TRIGGER_PUBLIC_HOST || "trigger.findmalek.engineer";
 	return deployCompose({
 		name: "lyterion-trigger",
 		file: "trigger.compose.yml",
