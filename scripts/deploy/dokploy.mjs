@@ -158,10 +158,13 @@ async function deployApp(environment, app) {
 	});
 	await ensureDomain(applicationId, app.host, app.port);
 	await dokploy("application.deploy", { applicationId });
+	// project.all leaves appName off its application rows, and it is the swarm service name other apps dial.
+	const { appName } = await query("application.one", { applicationId });
+	if (!appName) throw new Error(`dokploy returned no appName for ${app.name}`);
 	return {
 		...app,
 		applicationId,
-		appName: application.appName,
+		appName,
 		projectId: environment.projectId,
 	};
 }
