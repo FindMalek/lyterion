@@ -9,6 +9,7 @@ import {
 	TableRow,
 } from "@lyterion/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
 	formatDateTime,
 	formatDuration,
@@ -32,6 +33,11 @@ export function RunsTable() {
 			queryClient.invalidateQueries({ queryKey: orpc.runs.list.key() }),
 	});
 	const running = data?.some((run) => run.status === "running") ?? false;
+	const sync = useQuery({
+		...orpc.runs.syncState.queryOptions(),
+		meta: { silent: true },
+	});
+	const [confirmFinal, setConfirmFinal] = useState(false);
 
 	return (
 		<section>
@@ -42,6 +48,23 @@ export function RunsTable() {
 						<span className="truncate font-mono text-destructive text-xs">
 							{start.error.message}
 						</span>
+					)}
+					{sync.data?.dailySync !== false && (
+						<button
+							type="button"
+							disabled={running || start.isPending}
+							onBlur={() => setConfirmFinal(false)}
+							onClick={() => {
+								if (!confirmFinal) return setConfirmFinal(true);
+								setConfirmFinal(false);
+								start.mutate({ mode: "final" });
+							}}
+							className="shrink-0 font-mono text-muted-foreground text-xs hover:text-foreground disabled:text-muted-foreground/50"
+						>
+							{confirmFinal
+								? "click again: full export, then daily sync off"
+								: "final export"}
+						</button>
 					)}
 					<button
 						type="button"
@@ -57,6 +80,13 @@ export function RunsTable() {
 					</button>
 				</div>
 			</div>
+			{sync.data && (
+				<p className="border-b px-3 py-1 font-mono text-[11px] text-muted-foreground">
+					{sync.data.dailySync
+						? `daily spotify sync on${sync.data.lastSync ? ` · last export ${formatDateTime(sync.data.lastSync)} utc` : " · first run will be a full export"}`
+						: "daily spotify sync off since the final export"}
+				</p>
+			)}
 			{data && data.length === 0 ? (
 				<p className="px-3 py-3 text-muted-foreground text-xs">
 					No migration has run yet. Once Spotify, Navidrome and Trigger.dev are

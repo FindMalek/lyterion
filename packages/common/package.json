@@ -14,6 +14,9 @@
 		"./pipeline/start": {
 			"default": "./src/pipeline/start.ts"
 		},
+		"./spotify/sync-state": {
+			"default": "./src/spotify/sync-state.ts"
+		},
 		"./review": {
 			"default": "./src/review/persist.ts"
 		},

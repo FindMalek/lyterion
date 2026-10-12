@@ -99,7 +99,8 @@ export async function persistExport(out: LibraryExport): Promise<void> {
 					updatedAt: now,
 				},
 			});
-		if (playlist.itemsUnavailable) continue;
+		if (playlist.itemsUnavailable || out.unchangedPlaylists.has(playlist.id))
+			continue;
 		const entries = out.entries.filter((e) => e.playlistId === playlist.id);
 		await db.transaction(async (tx) => {
 			await tx
@@ -127,6 +128,7 @@ export async function persistExport(out: LibraryExport): Promise<void> {
 					},
 				});
 		}
+		if (!out.complete) continue;
 		const ids = saves.map((s) => s.spotifyId);
 		await db
 			.update(librarySave)

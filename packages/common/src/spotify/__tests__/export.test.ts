@@ -174,3 +174,57 @@ describe("exportLibrary", () => {
 		expect(calls).toBe(2);
 	});
 });
+
+describe("exportLibrary incremental", () => {
+	it("stops at known saves, skips playlists whose snapshot didn't move, and marks the export partial", async () => {
+		const pages: Record<string, unknown> = {
+			[`${A}/me/tracks?limit=50&market=from_token`]: {
+				items: [
+					{
+						added_at: "2024-05-01T00:00:00Z",
+						track: { ...blinding, id: "new1" },
+					},
+					{ added_at: "2024-01-01T00:00:00Z", track: blinding },
+				],
+				next: `${A}/me/tracks?offset=50`,
+			},
+			[`${A}/me/albums?limit=50&market=from_token`]: { items: [], next: null },
+			[`${A}/me/following?type=artist&limit=50`]: {
+				artists: { items: [], next: null },
+			},
+			[`${A}/me/playlists?limit=50`]: {
+				items: [
+					{ id: "p1", name: "Drive", owner: { id: "me" }, snapshot_id: "s1" },
+					{ id: "p3", name: "New", owner: { id: "me" }, snapshot_id: "s9" },
+				],
+				next: null,
+			},
+			[`${A}/playlists/p3/items?limit=100&market=from_token&additional_types=track`]:
+				{ items: [], next: null },
+		};
+		const asked: string[] = [];
+		const client = createSpotifyClient(
+			async () => "token",
+			async (url) => {
+				const key = String(url);
+				asked.push(key);
+				if (!(key in pages)) throw new Error(`unexpected ${key}`);
+				return Response.json(pages[key]);
+			},
+		);
+		const out = await exportLibrary(
+			client,
+			{},
+			{
+				knownSaves: new Set(["liked_track:t1"]),
+				since: new Date("2024-04-01T00:00:00Z"),
+				playlistSnapshots: new Map([["p1", "s1"]]),
+			},
+		);
+		expect(out.complete).toBe(false);
+		expect(out.saves.map((s) => s.spotifyId)).toEqual(["new1", "t1"]);
+		expect(asked).not.toContain(`${A}/me/tracks?offset=50`);
+		expect([...out.unchangedPlaylists]).toEqual(["p1"]);
+		expect(asked.some((u) => u.includes("/playlists/p1/items"))).toBe(false);
+	});
+});

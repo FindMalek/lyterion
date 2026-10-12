@@ -86,6 +86,9 @@ export type SaveRow = {
 };
 
 export type LibraryExport = {
+	/** Partial lists (incremental) can't prove a removal, so persist only marks removals on full exports. */
+	complete: boolean;
+	unchangedPlaylists: Set<string>;
 	tracks: Map<string, TrackRow>;
 	albums: Map<string, AlbumRow>;
 	artists: Map<string, ArtistRow>;
@@ -142,11 +145,21 @@ export type ExportHooks = {
 	onPage?: (endpoint: string, items: unknown[]) => Promise<void> | void;
 };
 
+/** Daily sync (#11, D-029): stop paging saves at known items, skip playlists whose snapshot didn't move. */
+export type IncrementalState = {
+	knownSaves: Set<string>;
+	since: Date;
+	playlistSnapshots: Map<string, string>;
+};
+
 export async function exportLibrary(
 	client: SpotifyClient,
 	hooks: ExportHooks = {},
+	incremental?: IncrementalState,
 ): Promise<LibraryExport> {
 	const out: LibraryExport = {
+		complete: !incremental,
+		unchangedPlaylists: new Set(),
 		tracks: new Map(),
 		albums: new Map(),
 		artists: new Map(),
@@ -156,6 +169,11 @@ export async function exportLibrary(
 		skipped: { episodes: 0, removed: 0 },
 	};
 	const paged = <T>(page: unknown) => page as Paged<T>;
+	// Saves come newest first, so the first known item older than the last sync means the rest is known.
+	const isOld = (key: string, addedAt: string) =>
+		!!incremental &&
+		incremental.knownSaves.has(key) &&
+		new Date(addedAt) <= incremental.since;
 	const addTrack = (
 		track: RawTrack,
 		albumId?: string | null,
@@ -174,6 +192,7 @@ export async function exportLibrary(
 		paged<{ added_at: string; track: RawTrack | null }>,
 	)) {
 		await hooks.onPage?.("me/tracks", items);
+		let caughtUp = false;
 		for (const { added_at, track } of items) {
 			const id = track ? addTrack(track) : null;
 			if (id)
@@ -183,7 +202,9 @@ export async function exportLibrary(
 					addedAt: new Date(added_at),
 				});
 			else out.skipped.removed++;
+			if (isOld(`liked_track:${id}`, added_at)) caughtUp = true;
 		}
+		if (caughtUp) break;
 	}
 
 	for await (const items of client.paginate(
@@ -191,7 +212,9 @@ export async function exportLibrary(
 		paged<{ added_at: string; album: RawAlbum }>,
 	)) {
 		await hooks.onPage?.("me/albums", items);
+		let caughtUp = false;
 		for (const { added_at, album } of items) {
+			if (isOld(`saved_album:${album.id}`, added_at)) caughtUp = true;
 			out.albums.set(album.id, albumRow(album));
 			out.saves.push({
 				kind: "saved_album",
@@ -206,6 +229,7 @@ export async function exportLibrary(
 					: undefined;
 			}
 		}
+		if (caughtUp) break;
 	}
 
 	for await (const items of client.paginate(
@@ -256,6 +280,14 @@ export async function exportLibrary(
 				itemsUnavailable: false,
 			};
 			out.playlists.push(row);
+			if (
+				incremental &&
+				playlist.snapshot_id &&
+				incremental.playlistSnapshots.get(playlist.id) === playlist.snapshot_id
+			) {
+				out.unchangedPlaylists.add(playlist.id);
+				continue;
+			}
 			let position = 0;
 			try {
 				type RawItem = {

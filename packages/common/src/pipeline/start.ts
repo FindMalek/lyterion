@@ -4,6 +4,7 @@ import { env } from "@lyterion/env/server";
 import { configure, tasks } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
 
+import type { ExportMode } from "../spotify/sync-state";
 import type { spotifyExportTask } from "../trigger/tasks/spotify-export";
 
 export class StartRunError extends Error {}
@@ -31,7 +32,9 @@ export async function triggerTask(id: string, payload: unknown): Promise<void> {
 	}
 }
 
-export async function startMigrationRun(): Promise<{ runId: number }> {
+export async function startMigrationRun(
+	mode: ExportMode = "full",
+): Promise<{ runId: number }> {
 	configureTrigger();
 	const [running] = await db
 		.select({ id: migrationRun.id })
@@ -42,12 +45,13 @@ export async function startMigrationRun(): Promise<{ runId: number }> {
 
 	const [run] = await db
 		.insert(migrationRun)
-		.values({})
+		.values({ options: { mode } })
 		.returning({ id: migrationRun.id });
 	if (!run) throw new StartRunError("could not create the run");
 	try {
 		await tasks.trigger<typeof spotifyExportTask>("spotify.export", {
 			runId: run.id,
+			mode,
 		});
 	} catch (err) {
 		await db
