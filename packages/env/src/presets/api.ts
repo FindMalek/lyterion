@@ -1,6 +1,15 @@
 import { createEnv } from "@t3-oss/env-core";
 import { baseEnv } from "../base";
-import { aiModule, authModule, triggerModule, urlsModule } from "../modules";
+import {
+	aiModule,
+	authModule,
+	libraryModule,
+	navidromeModule,
+	notifyModule,
+	providersModule,
+	triggerModule,
+	urlsModule,
+} from "../modules";
 import { createServerRuntimeEnv } from "../utils/runtime-env";
 import { dbEnv } from "./db";
 
@@ -9,6 +18,10 @@ export const apiEnv = createEnv({
 	server: {
 		...aiModule.server,
 		...authModule.server,
+		...libraryModule.server,
+		...navidromeModule.server,
+		...notifyModule.server,
+		...providersModule.server,
 		...triggerModule.server,
 	},
 	client: {
