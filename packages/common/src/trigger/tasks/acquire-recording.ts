@@ -19,6 +19,7 @@ import {
 } from "../../pipeline/advance";
 import { createAcoustidClient } from "../../verify/acoustid";
 import { verifyFile } from "../../verify/index";
+import { navidromeScanTask, requestScan } from "./navidrome-scan";
 
 export const ACQUIRE_STAGE = "acquire";
 const PAUSE_DELAY = "10m";
@@ -74,13 +75,19 @@ export const acquireRecordingTask = task({
 		}
 
 		await recordOutcome(job, outcome);
+		if (outcome.status === "placed") await requestScan();
 		const progress = await incrementStage(
 			payload.runId,
 			ACQUIRE_STAGE,
 			outcome.status === "placed" ? { done: 1 } : { failed: 1 },
 		);
-		if (stageComplete(progress) && (await claimStage(payload.runId, "finish")))
+		if (
+			stageComplete(progress) &&
+			(await claimStage(payload.runId, "finish"))
+		) {
 			await finishRun(payload.runId, "done");
+			await navidromeScanTask.trigger({ force: true });
+		}
 		logger.info("acquire done", {
 			status: outcome.status,
 			tried: outcome.attempts.length,

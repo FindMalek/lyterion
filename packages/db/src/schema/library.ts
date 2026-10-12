@@ -172,3 +172,11 @@ export const reviewItem = pgTable(
 	},
 	(table) => [index("review_item_open_idx").on(table.resolvedAt)],
 );
+
+// One row (id 1): files placed since the last scan, for the debounced Navidrome scan (docs/library.md).
+export const navidromeScanState = pgTable("navidrome_scan_state", {
+	id: integer("id").primaryKey().default(1),
+	pending: integer("pending").notNull().default(0),
+	lastPlacedAt: timestamp("last_placed_at"),
+	lastScanAt: timestamp("last_scan_at"),
+});

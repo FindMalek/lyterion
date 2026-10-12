@@ -1,0 +1,108 @@
+import { subsonicAuthParams } from "../health/connections";
+
+// Subsonic API v1.16.1 against Navidrome, called as the owner (D-024).
+const TIMEOUT_MS = 30_000;
+const PAGE = 500;
+
+export type SubsonicSong = {
+	id: string;
+	path?: string;
+	title: string;
+	artist?: string;
+	album?: string;
+	duration?: number;
+	starred?: string;
+};
+
+export type ScanStatus = { scanning: boolean; count?: number };
+
+export type NavidromeCredentials = {
+	url: string;
+	user: string;
+	password: string;
+};
+
+export class SubsonicError extends Error {}
+
+export function createNavidromeClient(
+	creds: NavidromeCredentials,
+	doFetch: typeof fetch = fetch,
+) {
+	const base = creds.url.replace(/\/$/, "");
+
+	async function call<T>(
+		method: string,
+		params: Record<string, string | string[]> = {},
+	): Promise<T> {
+		const query = subsonicAuthParams(creds.user, creds.password);
+		for (const [key, value] of Object.entries(params))
+			for (const v of Array.isArray(value) ? value : [value])
+				query.append(key, v);
+		const res = await doFetch(`${base}/rest/${method}.view?${query}`, {
+			signal: AbortSignal.timeout(TIMEOUT_MS),
+		});
+		if (!res.ok) throw new SubsonicError(`${method}: HTTP ${res.status}`);
+		const body = (await res.json()) as {
+			"subsonic-response"?: {
+				status?: string;
+				error?: { message?: string };
+			} & Record<string, unknown>;
+		};
+		const reply = body["subsonic-response"];
+		if (reply?.status !== "ok")
+			throw new SubsonicError(
+				`${method}: ${reply?.error?.message ?? "failed"}`,
+			);
+		return reply as T;
+	}
+
+	return {
+		call,
+		async startScan(fullScan = false): Promise<ScanStatus> {
+			const reply = await call<{ scanStatus?: ScanStatus }>(
+				"startScan",
+				fullScan ? { fullScan: "true" } : {},
+			);
+			return reply.scanStatus ?? { scanning: true };
+		},
+		async getScanStatus(): Promise<ScanStatus> {
+			const reply = await call<{ scanStatus?: ScanStatus }>("getScanStatus");
+			return reply.scanStatus ?? { scanning: false };
+		},
+		/** Every song with its path; Navidrome treats an empty search3 query as "all". */
+		async allSongs(): Promise<SubsonicSong[]> {
+			const songs: SubsonicSong[] = [];
+			for (let offset = 0; ; offset += PAGE) {
+				const reply = await call<{ searchResult3?: { song?: SubsonicSong[] } }>(
+					"search3",
+					{
+						query: "",
+						songCount: String(PAGE),
+						songOffset: String(offset),
+						artistCount: "0",
+						albumCount: "0",
+					},
+				);
+				const page = reply.searchResult3?.song ?? [];
+				songs.push(...page);
+				if (page.length < PAGE) return songs;
+			}
+		},
+		async star(ids: {
+			id?: string[];
+			albumId?: string[];
+			artistId?: string[];
+		}) {
+			await call("star", ids as Record<string, string[]>);
+		},
+		async unstar(ids: {
+			id?: string[];
+			albumId?: string[];
+			artistId?: string[];
+		}) {
+			await call("unstar", ids as Record<string, string[]>);
+		},
+	};
+}
+
+export type NavidromeClient = ReturnType<typeof createNavidromeClient>;
