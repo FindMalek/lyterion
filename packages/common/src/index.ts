@@ -4,6 +4,7 @@ export * from "./identity/normalize";
 export * from "./identity/placement";
 export * from "./library/layout";
 export * from "./library/place";
+export * from "./library/playlist";
 export * from "./library/tags";
 export * from "./providers/rank";
 export * from "./providers/types";
