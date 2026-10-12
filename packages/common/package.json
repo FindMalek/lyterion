@@ -1,0 +1,28 @@
+{
+	"name": "@lyterion/common",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "tsc --noEmit",
+		"test": "vitest run"
+	},
+	"exports": {
+		".": {
+			"default": "./src/index.ts"
+		}
+	},
+	"dependencies": {
+		"@lyterion/db": "workspace:*",
+		"@lyterion/env": "workspace:*",
+		"@lyterion/logger": "workspace:*",
+		"@trigger.dev/sdk": "catalog:",
+		"drizzle-orm": "catalog:",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@lyterion/config": "workspace:*",
+		"typescript": "catalog:",
+		"vitest": "^5.0.0"
+	}
+}

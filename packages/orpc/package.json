@@ -1,0 +1,36 @@
+{
+	"name": "@lyterion/orpc",
+	"version": "0.0.0",
+	"type": "module",
+	"exports": {
+		".": {
+			"default": "./src/index.ts"
+		},
+		"./context": {
+			"default": "./src/context.ts"
+		},
+		"./client": {
+			"default": "./src/client.ts"
+		},
+		"./utils/headers": {
+			"default": "./src/utils/headers.ts"
+		},
+		"./utils/rate-limiter": {
+			"default": "./src/utils/rate-limiter.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@orpc/client": "catalog:",
+		"@orpc/server": "catalog:",
+		"@orpc/zod": "catalog:",
+		"@lyterion/core": "workspace:*",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@lyterion/config": "workspace:*",
+		"typescript": "catalog:"
+	}
+}

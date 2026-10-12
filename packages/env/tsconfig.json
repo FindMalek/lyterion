@@ -1,0 +1,3 @@
+{
+	"extends": "@lyterion/config/tsconfig.base.json"
+}

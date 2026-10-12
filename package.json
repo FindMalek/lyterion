@@ -1,0 +1,45 @@
+{
+	"name": "lyterion",
+	"private": true,
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	],
+	"type": "module",
+	"scripts": {
+		"build": "turbo build",
+		"check": "biome check --write .",
+		"check-types": "turbo check-types",
+		"db:generate": "turbo -F @lyterion/db db:generate",
+		"db:migrate": "turbo -F @lyterion/db db:migrate",
+		"db:push": "turbo -F @lyterion/db db:push",
+		"db:setup": "docker compose -f ./docker/docker-compose.yml up -d && pnpm db:push",
+		"db:studio": "turbo -F @lyterion/db db:studio",
+		"deploy:trigger": "node scripts/deploy-trigger.mjs",
+		"deps:sync": "(pnpm outdated -r || true) && pnpm update -r --latest && syncpack fix && pnpm install && (syncpack lint || true)",
+		"dev": "turbo dev",
+		"dev:ad": "concurrently -n api,dashboard,trigger -c blue,cyan,green \"turbo run dev --filter=api --filter=dashboard\" \"pnpm trigger:dev\"",
+		"dev:api": "concurrently -n api,trigger -c blue,green \"turbo -F api dev\" \"pnpm trigger:dev\"",
+		"dev:dashboard": "turbo -F dashboard dev",
+		"fix:all": "biome check --write --unsafe . || true",
+		"format": "biome format --write .",
+		"lint": "biome lint --write .",
+		"test": "turbo test",
+		"trigger:dev": "node scripts/run-trigger-dev.mjs"
+	},
+	"dependencies": {
+		"@lyterion/env": "workspace:*",
+		"dotenv": "catalog:",
+		"zod": "catalog:"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "catalog:",
+		"@lyterion/config": "workspace:*",
+		"@types/node": "^26.5.1",
+		"concurrently": "^10.0.5",
+		"syncpack": "^15.3.3",
+		"turbo": "^2.10.12",
+		"typescript": "catalog:"
+	},
+	"packageManager": "pnpm@11.20.0+sha512.9a6f330a95b66446ea088faf1521405a8a01f07fde7124cc9958dfed52d4bb436737e65b08f85f37b46fcba375092558ac51262b816844b22f63406ed166bfee"
+}

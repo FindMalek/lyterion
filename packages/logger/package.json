@@ -1,0 +1,21 @@
+{
+	"name": "@lyterion/logger",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "tsc --noEmit"
+	},
+	"exports": {
+		".": {
+			"default": "./src/index.ts"
+		}
+	},
+	"dependencies": {
+		"pino": "^10.3.1"
+	},
+	"devDependencies": {
+		"@lyterion/config": "workspace:*",
+		"typescript": "catalog:"
+	}
+}

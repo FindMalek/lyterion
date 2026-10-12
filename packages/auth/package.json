@@ -1,0 +1,25 @@
+{
+	"name": "@lyterion/auth",
+	"version": "0.0.0",
+	"type": "module",
+	"exports": {
+		".": {
+			"default": "./src/index.ts"
+		},
+		"./*": {
+			"default": "./src/*.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@lyterion/db": "workspace:*",
+		"@lyterion/env": "workspace:*",
+		"better-auth": "catalog:"
+	},
+	"devDependencies": {
+		"@lyterion/config": "workspace:*",
+		"typescript": "catalog:"
+	}
+}

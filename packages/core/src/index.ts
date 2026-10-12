@@ -1,0 +1,14 @@
+import { createAuth } from "@lyterion/auth";
+import { db } from "@lyterion/db";
+import { apiEnv } from "@lyterion/env/presets/api";
+
+/** Single place where server singletons (db, auth) are wired, so packages never import each other in a cycle. */
+export const database = db;
+
+export const auth = createAuth(db, {
+	LYTERION_BETTER_AUTH_SECRET: apiEnv.LYTERION_BETTER_AUTH_SECRET,
+	LYTERION_SPOTIFY_CLIENT_ID: apiEnv.LYTERION_SPOTIFY_CLIENT_ID,
+	LYTERION_SPOTIFY_CLIENT_SECRET: apiEnv.LYTERION_SPOTIFY_CLIENT_SECRET,
+	NEXT_PUBLIC_LYTERION_API_URL: apiEnv.NEXT_PUBLIC_LYTERION_API_URL,
+	NEXT_PUBLIC_LYTERION_DASHBOARD_URL: apiEnv.NEXT_PUBLIC_LYTERION_DASHBOARD_URL,
+});
