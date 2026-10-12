@@ -44,7 +44,7 @@ Manual:
 
 | task | key |
 |---|---|
-| `acquire.recording` | `recording:<id>:<attempt-generation>` |
+| `acquire.recording` | `recording:<id>:<run>:<generation>`: placed recordings are never queued again, misses get one try per run |
 | `acquire.release` | `release:<mbid>:<generation>` |
 | `library.place` | the file's content hash, so a re-place is a no-op |
 | `playlists.write` | playlist ID plus content hash |

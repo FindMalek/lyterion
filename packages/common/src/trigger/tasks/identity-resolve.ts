@@ -1,8 +1,14 @@
-import { logger, task } from "@trigger.dev/sdk";
+import { idempotencyKeys, logger, task } from "@trigger.dev/sdk";
+
+import { recordingsToAcquire } from "../../acquire/persist";
 
 import { runIdentityResolve } from "../../identity/persist";
 import { finishRun } from "../../pipeline/advance";
 import { updateStageProgress } from "../../pipeline/progress";
+import { chunk } from "../utils/chunk";
+import { ACQUIRE_STAGE, acquireRecordingTask } from "./acquire-recording";
+
+const BATCH = 500;
 
 const STAGE = "identity.resolve";
 
@@ -25,9 +31,35 @@ export const identityResolveTask = task({
 				failed: 0,
 				finishedAt: new Date().toISOString(),
 			});
-			// Last stage until acquire.* lands (#25).
-			await finishRun(runId, "done");
-			return summary;
+			const todo = await recordingsToAcquire();
+			await updateStageProgress(runId, ACQUIRE_STAGE, {
+				status: todo.length > 0 ? "running" : "done",
+				total: todo.length,
+				done: 0,
+				failed: 0,
+				startedAt: new Date().toISOString(),
+			});
+			if (todo.length === 0) {
+				await finishRun(runId, "done");
+				return { ...summary, acquire: 0 };
+			}
+			// One attempt per recording per run; the generation lets the owner force a retry inside a run.
+			for (const batch of chunk(todo, BATCH)) {
+				await acquireRecordingTask.batchTrigger(
+					await Promise.all(
+						batch.map(async (r) => ({
+							payload: { runId, recordingId: r.id },
+							options: {
+								idempotencyKey: await idempotencyKeys.create(
+									`recording:${r.id}:${runId}:${r.generation}`,
+									{ scope: "global" },
+								),
+							},
+						})),
+					),
+				);
+			}
+			return { ...summary, acquire: todo.length };
 		} catch (err) {
 			await updateStageProgress(runId, STAGE, {
 				status: "failed",
