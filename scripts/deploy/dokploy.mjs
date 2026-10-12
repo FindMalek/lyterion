@@ -442,14 +442,14 @@ async function commentFailed() {
 	);
 }
 
-async function ciInfra() {
+// One Dokploy compose from a file in infra/the-keep, with an optional public domain, deployed and waited on.
+async function deployCompose({ name, file, env, domain }) {
 	const { readFile } = await import("node:fs/promises");
 	const composeFile = await readFile(
-		new URL("../../infra/the-keep/ci.compose.yml", import.meta.url),
+		new URL(`../../infra/the-keep/${file}`, import.meta.url),
 		"utf8",
 	);
 	const { environment } = await ensureEnvironment(PRODUCTION_PROJECT);
-	const name = "lyterion-ci";
 	let compose = environment.compose?.find((c) => c.name === name);
 	if (!compose) {
 		await dokploy("compose.create", {
@@ -464,33 +464,32 @@ async function ciInfra() {
 			await ensureEnvironment(PRODUCTION_PROJECT)
 		).environment.compose?.find((c) => c.name === name);
 	}
-	if (!compose) throw new Error("lyterion-ci compose was not created");
+	if (!compose) throw new Error(`${name} compose was not created`);
+	const current = await query("compose.one", { composeId: compose.composeId });
 	await dokploy("compose.update", {
 		composeId: compose.composeId,
 		sourceType: "raw",
 		composeFile,
 		composePath: "./docker-compose.yml",
-		env: envText({
-			TURBO_TOKEN: requireEnv("TURBO_TOKEN"),
-			GARAGE_ACCESS_KEY: requireEnv("GARAGE_ACCESS_KEY"),
-			GARAGE_SECRET_KEY: requireEnv("GARAGE_SECRET_KEY"),
-		}),
+		env: envText(
+			typeof env === "function" ? env(parseEnvBlock(current.env)) : env,
+		),
 	});
-	// Public on purpose so GitHub runners reach it, every request needs TURBO_TOKEN (D-037).
-	const turboHost = process.env.TURBO_PUBLIC_HOST ?? "turbo.findmalek.engineer";
-	const domains = await query("domain.byComposeId", {
-		composeId: compose.composeId,
-	});
-	if (!domains.some((d) => d.host === turboHost)) {
-		await dokploy("domain.create", {
-			host: turboHost,
-			port: 3000,
-			https: true,
-			certificateType: "letsencrypt",
+	if (domain) {
+		const domains = await query("domain.byComposeId", {
 			composeId: compose.composeId,
-			serviceName: "turbo-cache",
-			domainType: "compose",
 		});
+		if (!domains.some((d) => d.host === domain.host)) {
+			await dokploy("domain.create", {
+				host: domain.host,
+				port: domain.port,
+				https: true,
+				certificateType: "letsencrypt",
+				composeId: compose.composeId,
+				serviceName: domain.serviceName,
+				domainType: "compose",
+			});
+		}
 	}
 	await dokploy("compose.deploy", { composeId: compose.composeId });
 	const started = Date.now();
@@ -499,11 +498,65 @@ async function ciInfra() {
 		const { composeStatus } = await query("compose.one", {
 			composeId: compose.composeId,
 		});
-		if (composeStatus === "done") return console.info("lyterion-ci deployed");
+		if (composeStatus === "done") return console.info(`${name} deployed`);
 		if (composeStatus === "error")
-			throw new Error("lyterion-ci deploy failed, check Dokploy logs");
+			throw new Error(`${name} deploy failed, check Dokploy logs`);
 	}
-	throw new Error("lyterion-ci deploy timed out");
+	throw new Error(`${name} deploy timed out`);
+}
+
+function ciInfra() {
+	// Public on purpose so GitHub runners reach it, every request needs TURBO_TOKEN (D-037).
+	return deployCompose({
+		name: "lyterion-ci",
+		file: "ci.compose.yml",
+		env: {
+			TURBO_TOKEN: requireEnv("TURBO_TOKEN"),
+			GARAGE_ACCESS_KEY: requireEnv("GARAGE_ACCESS_KEY"),
+			GARAGE_SECRET_KEY: requireEnv("GARAGE_SECRET_KEY"),
+		},
+		domain: {
+			host: process.env.TURBO_PUBLIC_HOST ?? "turbo.findmalek.engineer",
+			port: 3000,
+			serviceName: "turbo-cache",
+		},
+	});
+}
+
+// Generated once and kept in the compose env, so a redeploy never rotates them and logs nobody out (#4).
+const TRIGGER_GENERATED = [
+	"SESSION_SECRET",
+	"MAGIC_LINK_SECRET",
+	"ENCRYPTION_KEY",
+	"PROVIDER_SECRET",
+	"COORDINATOR_SECRET",
+	"MANAGED_WORKER_SECRET",
+	"POSTGRES_PASSWORD",
+	"CLICKHOUSE_PASSWORD",
+];
+
+function triggerInfra() {
+	const host = process.env.TRIGGER_PUBLIC_HOST ?? "trigger.findmalek.engineer";
+	return deployCompose({
+		name: "lyterion-trigger",
+		file: "trigger.compose.yml",
+		env: (current) => ({
+			...Object.fromEntries(
+				TRIGGER_GENERATED.map((key) => [
+					key,
+					current[key] || randomBytes(16).toString("hex"),
+				]),
+			),
+			TRIGGER_ORIGIN: `https://${host}`,
+			TRIGGER_WHITELISTED_EMAILS: requireEnv("TRIGGER_WHITELISTED_EMAILS"),
+			TRIGGER_GARAGE_ACCESS_KEY: requireEnv("TRIGGER_GARAGE_ACCESS_KEY"),
+			TRIGGER_GARAGE_SECRET_KEY: requireEnv("TRIGGER_GARAGE_SECRET_KEY"),
+			GHCR_USERNAME: requireEnv("GHCR_USERNAME"),
+			GHCR_READ_TOKEN: requireEnv("GHCR_READ_TOKEN"),
+		}),
+		// Public like the turbo cache: GitHub runners deploy tasks through it, and every API call needs a token.
+		domain: { host, port: 3000, serviceName: "webapp" },
+	});
 }
 
 const MODES = {
@@ -512,6 +565,7 @@ const MODES = {
 	production,
 	"comment-failed": commentFailed,
 	"ci-infra": ciInfra,
+	"trigger-infra": triggerInfra,
 	"remove-postgres": removePostgres,
 };
 
