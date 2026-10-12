@@ -411,12 +411,27 @@ async function ciInfra() {
 		composeFile,
 		composePath: "./docker-compose.yml",
 		env: envText({
-			RUNNER_TOKEN: process.env.RUNNER_TOKEN,
 			TURBO_TOKEN: requireEnv("TURBO_TOKEN"),
 			GARAGE_ACCESS_KEY: requireEnv("GARAGE_ACCESS_KEY"),
 			GARAGE_SECRET_KEY: requireEnv("GARAGE_SECRET_KEY"),
 		}),
 	});
+	// Public on purpose so GitHub runners reach it, every request needs TURBO_TOKEN (D-037).
+	const turboHost = process.env.TURBO_PUBLIC_HOST ?? "turbo.findmalek.engineer";
+	const domains = await query("domain.byComposeId", {
+		composeId: compose.composeId,
+	});
+	if (!domains.some((d) => d.host === turboHost)) {
+		await dokploy("domain.create", {
+			host: turboHost,
+			port: 3000,
+			https: true,
+			certificateType: "letsencrypt",
+			composeId: compose.composeId,
+			serviceName: "turbo-cache",
+			domainType: "compose",
+		});
+	}
 	await dokploy("compose.deploy", { composeId: compose.composeId });
 	const started = Date.now();
 	while (Date.now() - started < POLL_TIMEOUT_MS) {

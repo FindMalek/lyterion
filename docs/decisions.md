@@ -380,3 +380,25 @@ links like Vercel, the same PR comment layout, and turbo cache.
 - **Trigger.dev on previews:** not deployed. Preview apps get no Trigger
   key, so triggering is a no-op there. Tasks are tested with `pnpm
   trigger:dev`.
+
+## D-037 CI back on GitHub runners, homelab only hosts (2026-10-12, amends D-036)
+
+Self-hosted runners filled the Docker disk on `the-keep` (about 53GB of
+Docker data, mostly runner images and build cache), so Malek asked to use
+GitHub's CI instead.
+
+- **On GitHub-hosted runners:** CI, preview builds and production builds.
+  Docker layers are cached with the GitHub Actions cache (`type=gha`).
+- **On `the-keep`:** only the turbo remote cache stays, published at
+  `turbo.findmalek.engineer` with a Let's Encrypt cert. It's public so
+  GitHub runners can reach it; every request needs `TURBO_TOKEN`.
+- **Dokploy:** called through its public API (`DOKPLOY_PUBLIC_URL`).
+- **Image pulls:** Dokploy pulls from GHCR with the job's own `GITHUB_TOKEN`,
+  which is valid while the deploy step waits for Dokploy, so there's no
+  long-lived PAT. A redeploy started from the Dokploy UI later can fail to
+  pull; redeploy from the workflow instead.
+- **App env:** built from individual repo secrets
+  (`LYTERION_BETTER_AUTH_SECRET`, `LYTERION_SPOTIFY_CLIENT_ID`, ...), so each
+  value can be rotated on its own.
+- **Kill switch:** deploys and previews only run when the repo var
+  `DEPLOY_ENABLED` is `true`.

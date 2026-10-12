@@ -1,10 +1,5 @@
-# Runs on every push/PR: lint, typecheck+build and test as parallel jobs.
-# Runner and turbo remote cache live on the-keep (D-036). Until vars.CI_RUNNER is set
-# jobs fall back to GitHub runners, and turbo falls back to no remote cache.
-#   vars.CI_RUNNER: the-keep
-#   vars.TURBO_API: http://turbo-cache:3000 (dokploy network)
-#   vars.TURBO_TEAM: lyterion
-#   secrets.TURBO_TOKEN: the cache server's TURBO_TOKEN
+# Runs on every push/PR: lint, typecheck+build and test as parallel jobs on GitHub runners (D-037).
+# Turbo remote cache is the self-hosted one on the-keep: vars.TURBO_API, vars.TURBO_TEAM, secrets.TURBO_TOKEN.
 
 name: CI
 
@@ -15,7 +10,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,7 +37,7 @@ jobs:
         run: node scripts/check-comment-blocks.mjs "origin/${{ github.event.pull_request.base.ref || 'main' }}"
 
   build:
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     env:
       # SKIP_ENV_VALIDATION skips the zod check, but some routes still read these during static generation.
       SKIP_ENV_VALIDATION: "true"
@@ -76,7 +71,7 @@ jobs:
         run: pnpm build
 
   test:
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     env:
       SKIP_ENV_VALIDATION: "true"
       TURBO_API: ${{ vars.TURBO_API }}

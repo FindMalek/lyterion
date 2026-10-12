@@ -1,5 +1,5 @@
-# Production deploy on the-keep (D-036): images tagged main + sha, Dokploy redeploy, Trigger.dev tasks.
-# Skipped until vars.DOKPLOY_URL is set, see docs/infra.md#production.
+# Production deploy on Dokploy (D-036, D-037), built on GitHub runners: images tagged main + sha, Dokploy redeploy, Trigger.dev tasks.
+# Skipped until vars.DEPLOY_ENABLED is "true", see docs/infra.md#production.
 
 name: Deploy
 
@@ -18,8 +18,8 @@ permissions:
 
 jobs:
   deploy:
-    if: vars.DOKPLOY_URL != ''
-    runs-on: the-keep
+    if: vars.DOKPLOY_PUBLIC_URL != '' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       DASHBOARD_URL: https://${{ vars.PRODUCTION_DASHBOARD_HOST }}
@@ -60,6 +60,8 @@ jobs:
             TURBO_TEAM=${{ vars.TURBO_TEAM }}
           secrets: |
             turbo_token=${{ secrets.TURBO_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build dashboard
         uses: docker/build-push-action@v6
@@ -78,16 +80,27 @@ jobs:
             TURBO_TEAM=${{ vars.TURBO_TEAM }}
           secrets: |
             turbo_token=${{ secrets.TURBO_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Deploy apps
         env:
           IMAGE_TAG: sha-${{ github.sha }}
-          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+          DOKPLOY_URL: ${{ vars.DOKPLOY_PUBLIC_URL }}
           DOKPLOY_PUBLIC_URL: ${{ vars.DOKPLOY_PUBLIC_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-          GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
-          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
-          PRODUCTION_APP_ENV: ${{ secrets.PRODUCTION_APP_ENV }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_READ_TOKEN: ${{ github.token }}
+          PRODUCTION_APP_ENV: |
+            LYTERION_BETTER_AUTH_SECRET=${{ secrets.LYTERION_BETTER_AUTH_SECRET }}
+            LYTERION_SPOTIFY_CLIENT_ID=${{ secrets.LYTERION_SPOTIFY_CLIENT_ID }}
+            LYTERION_SPOTIFY_CLIENT_SECRET=${{ secrets.LYTERION_SPOTIFY_CLIENT_SECRET }}
+            LYTERION_NAVIDROME_URL=${{ vars.LYTERION_NAVIDROME_URL }}
+            LYTERION_NAVIDROME_USER=${{ vars.LYTERION_NAVIDROME_USER }}
+            LYTERION_NAVIDROME_PASSWORD=${{ secrets.LYTERION_NAVIDROME_PASSWORD }}
+            LYTERION_GROQ_API_KEY=${{ secrets.LYTERION_GROQ_API_KEY }}
+            LYTERION_ACOUSTID_API_KEY=${{ secrets.LYTERION_ACOUSTID_API_KEY }}
+            LYTERION_NTFY_URL=${{ vars.LYTERION_NTFY_URL }}
           PRODUCTION_DASHBOARD_HOST: ${{ vars.PRODUCTION_DASHBOARD_HOST }}
           PRODUCTION_API_HOST: ${{ vars.PRODUCTION_API_HOST }}
         run: node scripts/deploy/dokploy.mjs production
