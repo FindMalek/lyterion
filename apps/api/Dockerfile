@@ -1,11 +1,11 @@
 # Build context is the repo root: docker build -f apps/api/Dockerfile .
 FROM node:24-alpine AS base
-RUN corepack enable
+RUN corepack enable && npm install -g turbo@2.11.7
 
 FROM base AS pruner
 WORKDIR /app
 COPY . .
-RUN pnpm dlx turbo@2.11.7 prune api --docker
+RUN turbo prune api --docker
 
 FROM base AS builder
 WORKDIR /app
