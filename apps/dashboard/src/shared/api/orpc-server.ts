@@ -1,8 +1,7 @@
 import { createORPCClientUtils } from "@lyterion/orpc/client";
 import { env } from "@/lib/env";
 
-// Server-only ORPC client — safe for use in route handlers and server actions.
-// Forwards all request headers (including session cookie) automatically.
+// Server-only client, forwards request headers (session cookie included).
 const { client } = createORPCClientUtils({
 	apiUrl: env.NEXT_PUBLIC_LYTERION_API_URL,
 	getHeaders: async () => {

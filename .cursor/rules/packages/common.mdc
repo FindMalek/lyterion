@@ -1,0 +1,27 @@
+---
+description: Common package layout, services and Trigger.dev tasks
+globs:
+  - "packages/common/**"
+alwaysApply: false
+---
+
+# Common Package (`@lyterion/common`)
+
+## Layout (target, per docs/architecture.md)
+
+```
+src/
+  spotify/        client, export, GDPR export parser
+  identity/       normalization, grouping, MusicBrainz, placement
+  providers/      provider interface + one folder per provider
+  verify/         decode, duration, fingerprint, spectral
+  library/        tag, layout, place, m3u, navidrome client
+  trigger/tasks/  one folder per task
+  trigger/utils/  chunk + idempotency helpers
+```
+
+## Rules
+
+- Services are plain functions taking explicit inputs, tasks are thin wrappers around them
+- Anything touching the music library goes through `library/`, never raw fs calls in tasks (D-012)
+- Provider code never decides ranking, it returns candidates (`docs/providers.md`)

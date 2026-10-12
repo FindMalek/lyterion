@@ -322,3 +322,10 @@ the forwarded port pushed into slskd's listen port on change (D-030).
 A `binwiederhier/ntfy` container in Dokploy, LAN plus the Cloudflare Tunnel
 so the phone gets pushes away from home. Access control is on, and Lyterion
 publishes with a token. It's reusable by other homelab services.
+
+## D-035 Migrations run on api container start (2026-10-12)
+
+The database is LAN-only on `the-keep`, so GitHub runners can't reach it, and
+sonaraem's `drizzle-migrate.yml` isn't copied. The api container runs
+`pnpm db:migrate` before `next start`. Migrations are always generated with
+`pnpm db:generate`.

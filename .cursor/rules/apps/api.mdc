@@ -1,0 +1,25 @@
+---
+description: API app conventions, route structure, CORS, oRPC wiring
+globs:
+  - "apps/api/**"
+alwaysApply: false
+---
+
+# API App (`apps/api`)
+
+## Route Structure
+
+```
+src/app/api/
+  [[...rest]]/route.ts   oRPC RPC handler (/api/rpc) + OpenAPI reference (/api/rpc/api-reference)
+  auth/[...all]/route.ts Better Auth (/api/auth), owner Spotify login
+src/lib/                 cors, response, error payload helpers
+src/instrumentation.ts   points the Trigger.dev SDK at the self-hosted instance
+trigger.config.ts        Trigger.dev project config, tasks discovered from src/trigger
+```
+
+## Rules
+
+- CORS allows only the dashboard and API origins (`src/lib/cors.ts`)
+- Context comes from `createContext(headers)` in `@lyterion/orpc`, auth from `@lyterion/core`
+- Trigger.dev tasks live in `packages/common/src/trigger/tasks/`, re-export them from `src/trigger/` for CLI discovery

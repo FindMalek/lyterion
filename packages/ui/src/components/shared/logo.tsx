@@ -1,8 +1,6 @@
 import type * as React from "react";
 
-// "Ascending Pulse" mark — canonical geometry, mirrored in apps/*/src/app/icon.svg
-// (each app bakes in its own fill color there since Next's icon.svg route can't
-// consume this component). Keep both in sync if the mark ever changes.
+// Same geometry as apps/dashboard/src/app/icon.svg, keep both in sync.
 export function Logo(props: React.SVGProps<SVGSVGElement>) {
 	return (
 		<svg

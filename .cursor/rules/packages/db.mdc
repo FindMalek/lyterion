@@ -1,0 +1,25 @@
+---
+description: Drizzle schema, migrations and DB client conventions
+globs:
+  - "packages/db/**"
+alwaysApply: false
+---
+
+# DB Package (`@lyterion/db`)
+
+## Schema
+
+- One file per domain in `src/schema/`, re-exported from `src/schema/index.ts`
+- Table names snake_case, columns snake_case in SQL and camelCase in TS
+- Index foreign keys and common filter columns
+- Upserts use `conflictValue(col)` from `src/index.ts` in `onConflictDoUpdate`
+
+## Migrations
+
+- Change the schema, then `pnpm db:generate`. Never hand-write or edit migration SQL
+- Local dev can use `pnpm db:push`
+- Migrations run on api container start in the homelab (GitHub runners can't reach the LAN database)
+
+## Client
+
+`db` is drizzle on `pg` with a single pool from `LYTERION_DATABASE_URL`.

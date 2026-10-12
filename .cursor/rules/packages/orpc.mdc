@@ -1,0 +1,30 @@
+---
+description: oRPC procedures, context and router conventions
+globs:
+  - "packages/orpc/**"
+alwaysApply: false
+---
+
+# oRPC Package (`@lyterion/orpc`)
+
+## Procedures
+
+```
+publicProcedure        no auth, rate limited
+  └── protectedProcedure  owner session (context.session)
+```
+
+Every dashboard data route is `protectedProcedure`. `publicProcedure` is only for health checks.
+
+## Context
+
+- `session`: from `auth.api.getSession()` (`@lyterion/core`)
+- `headers`: raw request headers
+
+## Routers
+
+`src/routers/index.ts` holds `appRouter`. Add one file per domain under `src/routers/` and spread it into `appRouter` once it grows past a couple of routes.
+
+```typescript
+const { data } = useQuery(orpc.me.queryOptions());
+```

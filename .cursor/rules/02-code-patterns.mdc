@@ -1,0 +1,167 @@
+---
+description: Core code patterns — oRPC procedures, Drizzle queries, Trigger.dev tasks, service layer, state management
+globs:
+  - "**/*.ts"
+  - "**/*.tsx"
+alwaysApply: false
+---
+
+# Code Patterns
+
+## oRPC Procedure Hierarchy
+
+```
+publicProcedure          no auth, rate limited
+  └── protectedProcedure owner session (context.session)
+```
+
+- **`protectedProcedure`**: every dashboard data route
+
+## Adding an oRPC Route
+
+1. Add Zod schemas to `packages/common/src/schemas/{entity}/`
+2. Add handler in `packages/orpc/src/routers/`
+3. Export from that router's `index.ts`
+
+```typescript
+export const playlistsRouter = {
+  list: protectedProcedure
+    .input(playlistListInput)
+    .output(z.array(playlistListItemSchema))
+    .handler(async ({ context }) => {
+      const userId = context.session.user.id;
+      return await db.select().from(playlist).where(eq(playlist.userId, userId));
+    }),
+};
+```
+
+## Reuse Schema-Inferred Types
+
+Before writing an inline object type/interface for a shape that already has a Zod schema in `packages/common/src/schemas/{entity}/`, check whether that schema's inferred type already covers it — use `z.infer<typeof someSchema>` (exported as a named type) instead of redeclaring the shape by hand. Only write a fresh inline type when no matching schema exists yet; if the shape is reused or worth validating, add the schema first.
+
+## Drizzle Query Patterns
+
+```typescript
+import { db } from "@lyterion/db";
+import { track } from "@lyterion/db/schema/track";
+import { eq, and, isNull } from "drizzle-orm";
+
+// Select
+const tracks = await db.select().from(track).where(eq(track.userId, userId));
+
+// Insert + return
+const [row] = await db.insert(myTable).values({ ... }).returning({ id: myTable.id });
+
+// Progress updates: use existing typed service helpers, do not inline SQL snippets
+await updateStageProgress(runId, "embed", { embedded: 10, total: 100, pending: 90 });
+```
+
+## Raw SQL and Parsing Safety
+
+- No inline raw SQL snippets in app/service/router code.
+- Use Drizzle query builder and typed helpers only (`eq`, `and`, `or`, `isNull`, `isNotNull`, `count`, `inArray`, `ilike`, etc).
+- If a required DB operation is not representable through typed Drizzle APIs, stop and refactor the approach so the final implementation remains typed and schema-aware.
+- Never `JSON.parse` DB string columns inline in service code. Use a shared safe parser utility that validates shape and falls back safely.
+- After schema refactors (renamed/dropped columns), run a repository audit for stale column references before merge.
+
+## Adding a DB Table
+
+```typescript
+// packages/db/src/schema/my-table.ts
+export const myTable = pgTable("my_table", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [index("my_table_user_id_idx").on(table.userId)]);
+```
+
+- Always `onDelete: "cascade"` for user-owned tables
+- Always index foreign keys and common filter columns
+- Run `pnpm db:push` after schema changes in development
+
+## Trigger.dev Task Pattern
+
+See `.cursor/rules/packages/trigger.mdc`.
+
+## State Management
+
+- **Server state**: TanStack Query v5 via oRPC client
+- **Client state**: Zustand in `apps/dashboard/src/shared/lib/{domain}/store.ts` (not a top-level `stores/` folder)
+- **No Redux, no Context API for global state**
+
+## Client Components
+
+```typescript
+"use client"; // only when needed
+
+export function MyComponent() {
+  const { data } = useQuery(orpc.playlists.list.queryOptions());
+  return <div>{data?.map(...)}</div>;
+}
+```
+
+## Error Handling
+
+- Mutations use `toast.error()` for failures
+- No `toast.success()` on pipeline launch — the drawer opening is sufficient feedback
+- Always provide `onRetry` to `ErrorState` components
+
+## No Type Assertions
+
+Never use `as SomeType` or `as unknown as SomeType` casts. Rely on TypeScript's type narrowing (`if`, `instanceof`, type guards) or correct type annotations at the source.
+
+- If a third-party return type is wrong, fix the generic parameter or write a narrow type guard — never `as`.
+- If two types don't align structurally, fix the type definition rather than casting around it.
+- The only accepted `as` uses are temporary escape hatches for genuine jsonb raw-SQL constraints, documented with an explicit comment explaining why narrowing is impossible.
+
+## Indexed Access (`noUncheckedIndexedAccess`)
+
+`array[0]` and destructured array elements are typed `T | undefined`. Never silence this with `!` or `.at()` — the repo has zero non-null assertions and zero `.at()` calls. Use one of:
+
+```typescript
+// Aggregate/lookup queries: optional-chain into a default
+const total = rows[0]?.count ?? 0;
+
+// Single-row selects expected to exist: destructure, then guard
+const [row] = await db.select().from(user).where(eq(user.id, userId));
+if (!row) {
+  throw new ORPCError("NOT_FOUND");
+}
+```
+
+## No Comments Rule
+
+CI-enforced: `scripts/check-comment-blocks.mjs` fails a PR that adds 2+ consecutive `//` lines (see the `lint` job in `.github/workflows/ci.yml`). Scoped to the diff, not the whole repo — existing violations are pending cleanup, not exempt from the rule.
+
+Default to no comment. Add one only when the WHY is genuinely non-obvious from
+the code itself: a hidden constraint, a workaround for a specific bug,
+behavior that would surprise a reader. Never comment WHAT the code does —
+that's what naming is for.
+
+Hard limits:
+
+- **One line, always.** No multi-line comment blocks, no wrapped paragraphs
+  above a function or a field. If it doesn't fit on one line, cut it down
+  until it does — don't wrap it instead. This has been violated repeatedly;
+  treat it as a hard stop, not a style preference. Before finishing any edit
+  that adds a comment, check it: is it wrapped across 2+ `//` lines? If yes,
+  compress it before moving on, don't leave it for review to catch.
+  Example — wrong:
+  ```ts
+  // Duration drift allowed before two Spotify tracks stop counting as
+  // the same recording, even when ISRC and title both match.
+  const DURATION_TOLERANCE_MS = 3000;
+  ```
+  right:
+  ```ts
+  // Max duration drift before two Spotify tracks stop being the same recording.
+  const DURATION_TOLERANCE_MS = 3000;
+  ```
+- If the reasoning genuinely can't compress to one line, it belongs in the
+  relevant `.cursor/rules/*.mdc` doc, not the code. Code comments point at a
+  local, single-spot reason; anything broader (a convention, a pattern, a
+  design decision affecting multiple call sites) is a rule doc's job.
+- Never restate the name of the thing being commented, never describe normal
+  control flow, never leave a comment a reviewer would delete without asking.
+- When in doubt, don't write it. A missing comment costs nothing; a bad one
+  gets copy-pasted forever.
