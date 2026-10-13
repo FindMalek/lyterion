@@ -29,8 +29,7 @@ function ytDlp(): BuildExtension {
 	};
 }
 
-// The deploy indexer imports every task file inside the image build, where no app env exists.
-// build.env only reaches the build and indexer stages, so runs still validate their env.
+// The deploy indexer imports every task file in the image build, with no app env; build.env never reaches runs.
 function skipEnvValidationAtIndex(): BuildExtension {
 	return {
 		name: "skip-env-validation-at-index",
