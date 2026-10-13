@@ -561,3 +561,15 @@ script once and kept on redeploys. Previews have no staging, so they get none.
 The browser's `<audio controls>` is replaced by a player built from the kit's
 Button and Slider (D-015), with space to play/pause. The nav shows open
 review items as an amber count until the queue is empty.
+
+## D-051 Dashboard v2: Geist, 14px, the kit everywhere (2026-10-13, amends D-015)
+
+Malek found the dashboard too small and inconsistent. Every screen now builds
+from the `@lyterion/ui` kit (sidebar, tables, sheets, dialogs, toggle groups,
+tooltips) through a handful of shared parts: PageHeader, PageTabs, Section,
+Stat, StatusBadge, EmptyState, ConfirmAction. Type is Geist for text and Geist
+Mono for every number, id and path, loaded with `next/font`; the old theme
+named "Inter Variable" but never loaded it. Base size is 14px instead of 13,
+rows and titles grow with it. Still monochrome, `--radius: 0`, color only for
+status. Stat grids carry crosshair marks at their corners. Destructive or
+run-stopping actions confirm in a dialog instead of a second click.

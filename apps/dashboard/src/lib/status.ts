@@ -4,6 +4,7 @@ export type ConnectionRow = {
 	id: string;
 	label: string;
 	configured: boolean;
+	setUp?: boolean;
 	ok: boolean | null;
 	latencyMs: number | null;
 	detail: string | null;
@@ -12,10 +13,21 @@ export type ConnectionRow = {
 export type RunRow = {
 	id: number;
 	status: string;
-	stages: Record<string, { total: number; done: number; failed: number }>;
+	stages: Record<
+		string,
+		{ total: number; done: number; failed: number; error?: string | null }
+	>;
 	startedAt: Date | string;
 	finishedAt: Date | string | null;
 };
+
+// Setup is done once the service is configured (Spotify: signed in); whether it answers right now is health, not setup.
+export function isSetUp(row: ConnectionRow): boolean {
+	if (row.setUp !== undefined) return row.setUp;
+	return row.id === "spotify"
+		? row.configured && !row.detail?.startsWith("app ok")
+		: row.configured;
+}
 
 // Set but not probeable (an api key) counts as ready: green, not a warning.
 export function connectionState(row: ConnectionRow): {
@@ -25,21 +37,33 @@ export function connectionState(row: ConnectionRow): {
 	if (!row.configured) return { status: "idle", label: "not set" };
 	if (row.ok === false) return { status: "error", label: "down" };
 	if (row.id === "spotify")
-		return row.detail?.startsWith("app ok")
-			? { status: "warn", label: "sign in" }
-			: { status: "ok", label: "linked" };
+		return isSetUp(row)
+			? { status: "ok", label: "linked" }
+			: { status: "warn", label: "sign in" };
 	return { status: "ok", label: row.ok ? "connected" : "set" };
 }
 
-const STAGE_ORDER = [
-	"export",
-	"match",
-	"acquire",
-	"verify",
-	"place",
-	"scan",
-	"playlists",
+// Stages are stored under their task ids; these are the names shown, in pipeline order.
+const STAGES: [string, string][] = [
+	["spotify.export", "export"],
+	["export", "export"],
+	["spotify.import", "import"],
+	["identity.resolve", "match"],
+	["match", "match"],
+	["acquire", "acquire"],
+	["verify", "verify"],
+	["place", "place"],
+	["navidrome.scan", "scan"],
+	["scan", "scan"],
+	["playlists.write", "playlists"],
+	["playlists", "playlists"],
 ];
+const STAGE_ORDER = STAGES.map(([id]) => id);
+const STAGE_LABEL = new Map(STAGES);
+
+export function stageLabel(stage: string): string {
+	return STAGE_LABEL.get(stage) ?? stage.split(".").at(-1) ?? stage;
+}
 
 // Pipeline order, unknown stages last, so every run reads left to right the same way.
 export function orderedStages<T>(stages: Record<string, T>): [string, T][] {

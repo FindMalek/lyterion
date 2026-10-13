@@ -9,21 +9,9 @@ import {
 } from "@lyterion/db/schema/library";
 import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 
-import type { SlskdRef } from "../providers/slskd";
+import { candidateLabel, candidateSource } from "./source";
 
-// What the owner sees for a candidate: the file name a peer shared, or the catalog id.
-export function candidateLabel(providerId: string, ref: string): string {
-	try {
-		if (providerId === "slskd") {
-			const parsed = JSON.parse(ref) as SlskdRef;
-			return `${parsed.username}: ${parsed.filename.split(/[\\/]/).slice(-3).join("/")}`;
-		}
-		const parsed = JSON.parse(ref) as { id?: string; backend?: string };
-		return parsed.id ? `${providerId} #${parsed.id}` : ref;
-	} catch {
-		return ref;
-	}
-}
+export { candidateLabel, candidateSource };
 
 /** Open review items, for the nav badge. */
 export async function openReviewCount(): Promise<number> {
@@ -81,6 +69,7 @@ export async function openReviews() {
 				id: c.id,
 				providerId: c.providerId,
 				label: candidateLabel(c.providerId, c.ref),
+				source: candidateSource(c.providerId, c.ref),
 				format: c.format,
 				bitrateKbps: c.bitrateKbps,
 				bitDepth: c.bitDepth,

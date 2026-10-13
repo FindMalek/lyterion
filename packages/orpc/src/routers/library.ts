@@ -17,6 +17,8 @@ import { protectedProcedure } from "../procedures";
 const STATUSES = [
 	"pending",
 	"resolved",
+	"waiting",
+	"queued",
 	"searching",
 	"fetching",
 	"verifying",

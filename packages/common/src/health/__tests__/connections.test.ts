@@ -40,7 +40,12 @@ describe("checkConnections", () => {
 			ok: false,
 			detail: "HTTP 401",
 		});
-		expect(byId.spotify).toMatchObject({ configured: true, ok: null });
+		expect(byId.spotify).toMatchObject({
+			configured: true,
+			setUp: true,
+			ok: null,
+		});
+		expect(byId.deezer).toMatchObject({ setUp: false });
 		expect(byId.deezer).toMatchObject({ configured: false, ok: false });
 	});
 

@@ -1,4 +1,10 @@
-import { cn, LyterionBrandHeader } from "@lyterion/ui";
+import {
+	Alert,
+	AlertDescription,
+	cn,
+	Icons,
+	LyterionBrandHeader,
+} from "@lyterion/ui";
 import type * as React from "react";
 
 import { StatusDot } from "@/components/app/status-dot";
@@ -53,8 +59,11 @@ export function OnboardingShell({
 export function StepError({ message }: { message: string | null }) {
 	if (!message) return null;
 	return (
-		<p className="break-all border border-destructive/40 px-2 py-1.5 font-mono text-destructive text-xs">
-			{message}
-		</p>
+		<Alert variant="destructive">
+			<Icons.alertCircle />
+			<AlertDescription className="break-all font-mono">
+				{message}
+			</AlertDescription>
+		</Alert>
 	);
 }

@@ -1,4 +1,5 @@
 import { OverviewStats } from "@/components/app/overview-stats";
+import { RunControls } from "@/components/app/run-controls";
 import { RunsTable } from "@/components/app/runs-table";
 import { SetupChecklist } from "@/components/app/setup-checklist";
 import { PageHeader } from "@/components/shared/page-header";
@@ -8,7 +9,8 @@ export default function OverviewPage() {
 		<>
 			<PageHeader
 				title="Overview"
-				description="setup, services and migration runs"
+				description="your library, the run going now, and what needs you"
+				actions={<RunControls />}
 			/>
 			<SetupChecklist />
 			<OverviewStats />

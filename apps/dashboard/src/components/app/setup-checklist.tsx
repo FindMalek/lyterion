@@ -1,16 +1,37 @@
 "use client";
 
+import {
+	Button,
+	Icons,
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemTitle,
+	Progress,
+} from "@lyterion/ui";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { connectionState, REQUIRED_CONNECTIONS } from "@/lib/status";
+
+import { Section } from "@/components/shared/section";
+import { isSetUp, REQUIRED_CONNECTIONS } from "@/lib/status";
 import { orpc } from "@/shared/api/orpc";
 
-import { StatusDot } from "./status-dot";
-
-const STEPS: Record<string, string> = {
-	spotify: "sign in with spotify",
-	navidrome: "connect navidrome (url, user, password)",
-	trigger: "connect trigger.dev so runs can start",
+const STEPS: Record<string, { title: string; description: string }> = {
+	spotify: {
+		title: "Sign in with Spotify",
+		description: "Lyterion reads your library with your own developer app.",
+	},
+	navidrome: {
+		title: "Connect Navidrome",
+		description: "URL, user and password, for scans, playlists and stars.",
+	},
+	trigger: {
+		title: "Connect Trigger.dev",
+		description: "Runs the export, search and placement in the background.",
+	},
 };
 
 // Shown only while something the first migration needs is missing.
@@ -20,47 +41,55 @@ export function SetupChecklist() {
 	const needed = [...REQUIRED_CONNECTIONS, "trigger"].flatMap(
 		(id) => data.find((row) => row.id === id) ?? [],
 	);
-	const missing = needed.filter((row) => connectionState(row).status !== "ok");
-	if (missing.length === 0) return null;
+	const done = needed.filter(isSetUp);
+	if (done.length === needed.length) return null;
 
 	return (
-		<section className="border-b">
-			<div className="flex h-8 items-center justify-between border-b px-3">
-				<h2 className="font-medium text-xs uppercase tracking-wide">Setup</h2>
-				<span className="font-mono text-muted-foreground text-xs">
-					{needed.length - missing.length}/{needed.length} done
-				</span>
-			</div>
-			<ol className="divide-y">
+		<Section
+			title="Get started"
+			count={`${done.length}/${needed.length}`}
+			actions={
+				<Progress
+					value={(done.length / needed.length) * 100}
+					className="h-1 w-24"
+				/>
+			}
+		>
+			<ItemGroup className="divide-y">
 				{needed.map((row) => {
-					const { status } = connectionState(row);
+					const ok = isSetUp(row);
+					const step = STEPS[row.id] ?? { title: row.label, description: "" };
 					return (
-						<li
-							key={row.id}
-							className="flex h-8 items-center justify-between gap-3 px-3 text-xs"
-						>
-							<span className="flex items-center gap-2">
-								<StatusDot status={status} />
-								<span
-									className={
-										status === "ok" ? "text-muted-foreground line-through" : ""
-									}
+						<Item key={row.id} size="sm">
+							<ItemMedia>
+								{ok ? (
+									<Icons.circleCheck className="size-4 text-success" />
+								) : (
+									<span className="size-4 border border-muted-foreground/40" />
+								)}
+							</ItemMedia>
+							<ItemContent>
+								<ItemTitle
+									className={ok ? "text-muted-foreground line-through" : ""}
 								>
-									{STEPS[row.id] ?? row.label}
-								</span>
-							</span>
-							{status !== "ok" && (
-								<Link
-									href={`/connections?edit=${row.id}`}
-									className="font-mono text-muted-foreground hover:text-foreground"
-								>
-									set up →
-								</Link>
+									{step.title}
+								</ItemTitle>
+								{!ok && <ItemDescription>{step.description}</ItemDescription>}
+							</ItemContent>
+							{!ok && (
+								<ItemActions>
+									<Button size="xs" variant="outline" asChild>
+										<Link href={`/connections?edit=${row.id}`}>
+											Set up
+											<Icons.arrowRight />
+										</Link>
+									</Button>
+								</ItemActions>
 							)}
-						</li>
+						</Item>
 					);
 				})}
-			</ol>
-		</section>
+			</ItemGroup>
+		</Section>
 	);
 }

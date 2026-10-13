@@ -9,8 +9,8 @@ export const brandTokens = {
 export function LyterionBrandHeader({ className }: { className?: string }) {
 	return (
 		<div className={cn("flex items-center gap-2.5", className)}>
-			<Icons.logo className="size-3 text-foreground" />
-			<span className="font-medium font-mono text-foreground text-sm">
+			<Icons.logo className="size-4 text-foreground" />
+			<span className="font-mono font-semibold text-base text-foreground tracking-tight">
 				{brandTokens.name}
 			</span>
 		</div>

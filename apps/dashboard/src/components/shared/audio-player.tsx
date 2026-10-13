@@ -99,7 +99,7 @@ export function AudioPlayer({ src, className, ref }: Props) {
 			</Button>
 			{failed ? (
 				<span className="truncate font-mono text-[11px] text-destructive">
-					preview unavailable: the staged file is gone or unreadable
+					preview unavailable (file gone)
 				</span>
 			) : (
 				<>
