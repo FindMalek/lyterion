@@ -37,11 +37,12 @@ services:
       SLSKD_WEB_USERNAME: ${SLSKD_WEB_USERNAME:-findmalek}
       SLSKD_WEB_PASSWORD: ${SLSKD_WEB_PASSWORD}
       SLSKD_API_KEY: ${SLSKD_API_KEY}
+      # slskd-config.sh, base64, set by the deploy: a raw Dokploy compose has no repo files next to it.
+      SLSKD_CONFIG_SCRIPT: ${SLSKD_CONFIG_SCRIPT}
     volumes:
       - gluetun:/gluetun:ro
       - slskd-app:/app
-      - ./slskd-config.sh:/slskd-config.sh:ro
-    command: ["/bin/sh", "/slskd-config.sh"]
+    command: ["/bin/sh", "-c", "echo \"$$SLSKD_CONFIG_SCRIPT\" | base64 -d > /tmp/slskd-config.sh && exec /bin/sh /tmp/slskd-config.sh"]
     healthcheck:
       test: ["CMD", "test", "-s", "/app/slskd.yml"]
       interval: 5s

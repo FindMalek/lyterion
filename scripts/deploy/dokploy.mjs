@@ -565,6 +565,42 @@ function triggerInfra() {
 	});
 }
 
+// slskd behind gluetun, and ntfy (#7). Only the Proton key is required; the rest is generated once and kept.
+async function servicesInfra() {
+	const { readFile } = await import("node:fs/promises");
+	const script = await readFile(
+		new URL("../../infra/the-keep/slskd-config.sh", import.meta.url),
+	);
+	const suffix = randomBytes(3).toString("hex");
+	return deployCompose({
+		name: "lyterion-services",
+		file: "services.compose.yml",
+		env: (current) => ({
+			PROTON_WIREGUARD_PRIVATE_KEY: requireEnv("PROTON_WIREGUARD_PRIVATE_KEY"),
+			PROTON_SERVER_COUNTRIES:
+				process.env.PROTON_SERVER_COUNTRIES || current.PROTON_SERVER_COUNTRIES,
+			SLSK_USERNAME:
+				process.env.SLSK_USERNAME ||
+				current.SLSK_USERNAME ||
+				`lyterion-${suffix}`,
+			SLSK_PASSWORD:
+				process.env.SLSK_PASSWORD ||
+				current.SLSK_PASSWORD ||
+				randomBytes(16).toString("hex"),
+			SLSKD_WEB_PASSWORD:
+				current.SLSKD_WEB_PASSWORD || randomBytes(16).toString("hex"),
+			SLSKD_API_KEY: current.SLSKD_API_KEY || randomBytes(24).toString("hex"),
+			SLSKD_CONFIG_SCRIPT: script.toString("base64"),
+			NTFY_BASE_URL: `https://${process.env.NTFY_PUBLIC_HOST || "ntfy.findmalek.engineer"}`,
+		}),
+		domain: {
+			host: process.env.NTFY_PUBLIC_HOST || "ntfy.findmalek.engineer",
+			port: 80,
+			serviceName: "ntfy",
+		},
+	});
+}
+
 const MODES = {
 	"preview-up": previewUp,
 	"preview-down": previewDown,
@@ -572,6 +608,7 @@ const MODES = {
 	"comment-failed": commentFailed,
 	"ci-infra": ciInfra,
 	"trigger-infra": triggerInfra,
+	"services-infra": servicesInfra,
 	"remove-postgres": removePostgres,
 };
 
