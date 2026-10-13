@@ -56,11 +56,17 @@ export function ReviewQueue() {
 		function onKey(e: KeyboardEvent) {
 			if (
 				e.target instanceof HTMLInputElement ||
+				e.target instanceof HTMLTextAreaElement ||
 				e.metaKey ||
 				e.ctrlKey ||
 				!item
 			)
 				return;
+			// Space and Enter belong to a focused button, link or slider; the shortcuts only fire from the page itself.
+			const onControl =
+				e.target instanceof Element &&
+				!!e.target.closest("button, a, [role=slider], [role=button]");
+			if ((e.key === " " || e.key === "Enter") && onControl) return;
 			if (e.key === "j")
 				setCandidateIndex((i) => Math.min(i + 1, candidates.length - 1));
 			else if (e.key === "k") setCandidateIndex((i) => Math.max(i - 1, 0));
