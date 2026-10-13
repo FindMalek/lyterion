@@ -1,4 +1,4 @@
-import { mkdir, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { db } from "@lyterion/db";
@@ -21,6 +21,7 @@ import {
 	writeLyrics,
 } from "../library/extras";
 import { libraryRelativePath } from "../library/layout";
+import { moveFile } from "../library/move";
 import {
 	downsampleToCap,
 	type PlaceOptions,
@@ -339,6 +340,6 @@ export async function moveToReview(
 	const dir = reviewDir(stagingDir, recordingId);
 	await mkdir(dir, { recursive: true });
 	const dest = path.join(dir, path.basename(file));
-	await rename(file, dest);
+	await moveFile(file, dest);
 	return dest;
 }

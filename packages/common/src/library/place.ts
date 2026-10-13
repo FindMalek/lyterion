@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import type { AudioFacts } from "../verify/audio";
+import { moveFile } from "./move";
 import type { TagMap } from "./tags";
 
 const run = promisify(execFile);
@@ -145,7 +146,7 @@ export type PlaceInput = {
 	coverPath: string | null;
 };
 
-// Staging and the library share a filesystem, so the final rename is atomic and Navidrome never sees half a file.
+// Staging and the library are separate mounts in a run, so moveFile copies beside the target and renames: Navidrome never sees half a file.
 export async function placeFile(
 	input: PlaceInput,
 	options: PlaceOptions,
@@ -164,7 +165,7 @@ export async function placeFile(
 	}
 	const folder = dirname(target);
 	await mkdir(folder, { recursive: true });
-	await rename(input.stagedPath, target);
+	await moveFile(input.stagedPath, target);
 	const folderCover = join(folder, "cover.jpg");
 	if (input.coverPath && !(await exists(folderCover))) {
 		const tmp = `${folderCover}.tmp`;

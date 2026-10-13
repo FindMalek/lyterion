@@ -57,6 +57,15 @@ export async function probe(path: string): Promise<AudioFacts> {
 	};
 }
 
+// Soulseek files often carry a junk trailing tag or one bad frame that ffmpeg reports and plays straight past.
+export const MAX_DECODE_ERRORS = 5;
+
+/** A full decode that exits cleanly with at most a few frame errors; more than that is audible damage. */
+export function decodeIsClean(stderr: string): boolean {
+	const errors = stderr.split("\n").filter((line) => line.trim() !== "");
+	return errors.length <= MAX_DECODE_ERRORS;
+}
+
 export async function decodesCleanly(path: string): Promise<boolean> {
 	try {
 		const { stderr } = await run(
@@ -66,7 +75,7 @@ export async function decodesCleanly(path: string): Promise<boolean> {
 				maxBuffer: MAX_BUFFER,
 			},
 		);
-		return stderr.trim() === "";
+		return decodeIsClean(stderr);
 	} catch {
 		return false;
 	}
@@ -206,7 +215,8 @@ export async function isPadded24Bit(
 export type Fingerprint = { fingerprint: string; durationSec: number };
 
 export async function fingerprint(path: string): Promise<Fingerprint> {
-	const { stdout } = await run("fpcalc", ["-json", path], {
+	// Without -ignore-errors one bad frame fails the whole fingerprint, after decodesCleanly already accepted it.
+	const { stdout } = await run("fpcalc", ["-json", "-ignore-errors", path], {
 		maxBuffer: MAX_BUFFER,
 	});
 	const data = JSON.parse(stdout) as { fingerprint: string; duration: number };
