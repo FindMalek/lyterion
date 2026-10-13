@@ -46,3 +46,20 @@ export function candidateSource(
 	}
 	return { url: null, copy: ref };
 }
+
+// A picked item hides while review.resolve places it; one stuck longer than this (a crashed task) shows again.
+export const PICK_STALE_MS = 2 * 3600_000;
+
+/** What a pending review's `resolution` says: waiting on the owner, being placed, or a pick that failed (shown again with its reason). */
+export function pickState(
+	resolution: string | null,
+	now = Date.now(),
+): { hidden: boolean; lastError: string | null } {
+	if (resolution?.startsWith("picking:")) {
+		const at = Number(resolution.split(":")[2]);
+		return { hidden: !(at && now - at > PICK_STALE_MS), lastError: null };
+	}
+	if (resolution?.startsWith("failed:"))
+		return { hidden: false, lastError: resolution.slice("failed:".length) };
+	return { hidden: false, lastError: null };
+}

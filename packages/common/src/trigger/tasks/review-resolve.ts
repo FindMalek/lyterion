@@ -14,6 +14,7 @@ import { albumGainAfterPlace } from "../../library/album-gain";
 import type { AudioFormat, Candidate, ProviderId } from "../../providers/types";
 import {
 	discardStaged,
+	markPickFailed,
 	resolveReview,
 	reviewForRecording,
 	stagedCandidate,
@@ -38,71 +39,84 @@ export const reviewResolveTask = task({
 	id: "review.resolve",
 	queue: acquireQueue,
 	maxDuration: 3600,
-	run: async ({ reviewId, candidateId }: ReviewPickPayload) => {
-		const review = await reviewForRecording(reviewId);
-		const row = await stagedCandidate(candidateId);
-		if (!review || !row || row.recordingId !== review.recordingId)
-			throw new Error("review or candidate not found");
-		const job = await loadAcquireJob(review.recordingId);
-		if (!job) throw new Error("recording gone");
-		const picked: Candidate = {
-			providerId: row.providerId as ProviderId,
-			ref: row.ref,
-			format: row.format as AudioFormat,
-			bitrateKbps: row.bitrateKbps ?? undefined,
-			bitDepth: row.bitDepth ?? undefined,
-			sampleRateHz: row.sampleRateHz ?? undefined,
-			durationMs: row.durationMs ?? undefined,
-			isrcMatch: row.isrcMatch,
-			matchConfidence: 1,
-		};
-
-		let file =
-			row.stagedPath && (await exists(row.stagedPath)) ? row.stagedPath : null;
-		if (!file) {
-			const provider = (await configuredProviders()).find(
-				(p) => p.id === picked.providerId,
+	run: async (payload: ReviewPickPayload) => {
+		try {
+			return await resolvePick(payload);
+		} catch (err) {
+			// Back in the owner's queue with the reason, instead of hidden forever.
+			await markPickFailed(
+				payload.reviewId,
+				err instanceof Error ? err.message : String(err),
 			);
-			if (!provider)
-				throw new Error(`${picked.providerId} is not configured anymore`);
-			file = (await provider.fetch(picked, env.LYTERION_STAGING_DIR)).path;
+			throw err;
 		}
-		const verify = await verifyFile(file, {
-			durationMs: job.target.durationMs,
-			mbRecordingIds: [],
-			candidate: picked,
-		});
-		if (!verify.ok)
-			throw new Error(`picked file failed verification: ${verify.reason}`);
-		const path = await createPlacer(job, {
-			musicDir: env.LYTERION_MUSIC_DIR,
-			librarySubdir: env.LYTERION_LIBRARY_SUBDIR,
-			python: env.LYTERION_PYTHON,
-			maxBitDepth: env.LYTERION_MAX_BIT_DEPTH,
-			maxSampleRateHz: env.LYTERION_MAX_SAMPLE_RATE_HZ,
-		})(file, picked, verify);
-		const outcome: AcquireOutcome = {
-			status: "placed",
-			path,
-			chosen: picked,
-			verify: {
-				...verify,
-				upgradeReason: verify.upgradeReason ?? "unverified_match",
-			},
-			attempts: [
-				{
-					candidate: { ...picked, matchConfidence: row.matchConfidence },
-					rank: row.rank,
-					state: "chosen",
-				},
-			],
-		};
-		await recordOutcome(job, outcome);
-		await resolveReview(reviewId, `picked:${candidateId}`);
-		await discardStaged(review.recordingId);
-		await albumGainAfterPlace(job.placement.releaseId, env.LYTERION_PYTHON);
-		await requestScan();
-		logger.info("review resolved", { reviewId, candidateId, path });
-		return { path };
 	},
 });
+
+async function resolvePick({ reviewId, candidateId }: ReviewPickPayload) {
+	const review = await reviewForRecording(reviewId);
+	const row = await stagedCandidate(candidateId);
+	if (!review || !row || row.recordingId !== review.recordingId)
+		throw new Error("review or candidate not found");
+	const job = await loadAcquireJob(review.recordingId);
+	if (!job) throw new Error("recording gone");
+	const picked: Candidate = {
+		providerId: row.providerId as ProviderId,
+		ref: row.ref,
+		format: row.format as AudioFormat,
+		bitrateKbps: row.bitrateKbps ?? undefined,
+		bitDepth: row.bitDepth ?? undefined,
+		sampleRateHz: row.sampleRateHz ?? undefined,
+		durationMs: row.durationMs ?? undefined,
+		isrcMatch: row.isrcMatch,
+		matchConfidence: 1,
+	};
+
+	let file =
+		row.stagedPath && (await exists(row.stagedPath)) ? row.stagedPath : null;
+	if (!file) {
+		const provider = (await configuredProviders()).find(
+			(p) => p.id === picked.providerId,
+		);
+		if (!provider)
+			throw new Error(`${picked.providerId} is not configured anymore`);
+		file = (await provider.fetch(picked, env.LYTERION_STAGING_DIR)).path;
+	}
+	const verify = await verifyFile(file, {
+		durationMs: job.target.durationMs,
+		mbRecordingIds: [],
+		candidate: picked,
+	});
+	if (!verify.ok)
+		throw new Error(`picked file failed verification: ${verify.reason}`);
+	const path = await createPlacer(job, {
+		musicDir: env.LYTERION_MUSIC_DIR,
+		librarySubdir: env.LYTERION_LIBRARY_SUBDIR,
+		python: env.LYTERION_PYTHON,
+		maxBitDepth: env.LYTERION_MAX_BIT_DEPTH,
+		maxSampleRateHz: env.LYTERION_MAX_SAMPLE_RATE_HZ,
+	})(file, picked, verify);
+	const outcome: AcquireOutcome = {
+		status: "placed",
+		path,
+		chosen: picked,
+		verify: {
+			...verify,
+			upgradeReason: verify.upgradeReason ?? "unverified_match",
+		},
+		attempts: [
+			{
+				candidate: { ...picked, matchConfidence: row.matchConfidence },
+				rank: row.rank,
+				state: "chosen",
+			},
+		],
+	};
+	await recordOutcome(job, outcome);
+	await resolveReview(reviewId, `picked:${candidateId}`);
+	await discardStaged(review.recordingId);
+	await albumGainAfterPlace(job.placement.releaseId, env.LYTERION_PYTHON);
+	await requestScan();
+	logger.info("review resolved", { reviewId, candidateId, path });
+	return { path };
+}

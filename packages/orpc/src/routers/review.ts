@@ -1,5 +1,7 @@
 import { StartRunError, triggerTask } from "@lyterion/common/pipeline/start";
 import {
+	markPickFailed,
+	markPicking,
 	openReviewCount,
 	openReviews,
 	reviewForRecording,
@@ -32,9 +34,19 @@ export const reviewRouter = {
 				throw new ORPCError("NOT_FOUND", {
 					message: "review item or candidate not found",
 				});
+			// Hidden from the queue at once; the task restores it with the reason if placing fails.
+			if (!(await markPicking(input.reviewId, input.candidateId)))
+				throw new ORPCError("CONFLICT", {
+					message: "this track is already being placed",
+				});
 			try {
-				await triggerTask("review.resolve", input);
+				// Ahead of the bulk acquire backlog that shares the queue: an hour's worth of queue time.
+				await triggerTask("review.resolve", input, { priority: 3600 });
 			} catch (err) {
+				await markPickFailed(
+					input.reviewId,
+					err instanceof Error ? err.message : String(err),
+				);
 				if (err instanceof StartRunError)
 					throw new ORPCError("PRECONDITION_FAILED", { message: err.message });
 				throw err;
