@@ -38,10 +38,11 @@ const PAUSE_DELAY = "10m";
 
 export type AcquirePayload = { runId: number; recordingId: string };
 
-// Shared with acquire.release, so both count against the same two slots.
+// Shared by every task that downloads and verifies (acquire, release, review, upgrade); sized for the-keep's 6 cores (#118).
+export const ACQUIRE_CONCURRENCY = 8;
 export const acquireQueue: ReturnType<typeof queue> = queue({
 	name: "acquire",
-	concurrencyLimit: 2,
+	concurrencyLimit: ACQUIRE_CONCURRENCY,
 });
 
 /** One recording, start to stage counters; `providers` lets acquire.release hand in its album search results. */

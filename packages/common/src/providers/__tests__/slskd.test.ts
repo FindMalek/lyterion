@@ -259,3 +259,76 @@ describe("createSlskdProvider", () => {
 		expect(calls.filter((c) => c === "POST /searches")).toHaveLength(1);
 	});
 });
+
+describe("slskd download stalls", () => {
+	function stuck(states: (clock: number) => { state: string; bytes: number }) {
+		let clock = 0;
+		const deleted: string[] = [];
+		const doFetch = (async (input: string, init?: RequestInit) => {
+			const url = String(input).replace("http://slskd:5030/api/v0", "");
+			if (init?.method === "POST") return new Response("", { status: 201 });
+			if (init?.method === "DELETE") {
+				deleted.push(url);
+				return new Response("", { status: 204 });
+			}
+			const { state, bytes } = states(clock);
+			return Response.json({
+				directories: [
+					{
+						files: [
+							{
+								id: "t1",
+								filename: "Music\\a.flac",
+								state,
+								bytesTransferred: bytes,
+								size: 1000,
+							},
+						],
+					},
+				],
+			});
+		}) as typeof fetch;
+		const provider = createSlskdProvider({
+			url: "http://slskd:5030/",
+			apiKey: "k",
+			downloadsDir: "/nowhere",
+			fetch: doFetch,
+			now: () => clock,
+			sleep: async (ms) => {
+				clock += ms;
+			},
+		});
+		const candidate = {
+			providerId: "slskd",
+			ref: JSON.stringify({
+				username: "peer",
+				filename: "Music\\a.flac",
+				size: 1000,
+			}),
+			format: "flac",
+			isrcMatch: false,
+			matchConfidence: 0.9,
+		};
+		return {
+			fetch: () => provider.fetch(candidate as never, "/tmp/x"),
+			deleted,
+		};
+	}
+
+	it("gives up on a file a peer keeps queued, and cancels the transfer", async () => {
+		const s = stuck(() => ({ state: "Queued, Remotely", bytes: 0 }));
+		await expect(s.fetch()).rejects.toThrow(
+			/still Queued, Remotely after 3 min/,
+		);
+		expect(s.deleted).toEqual(["/transfers/downloads/peer/t1?remove=true"]);
+	});
+
+	it("gives up on a transfer that stops moving", async () => {
+		const s = stuck((clock) => ({
+			state: "InProgress",
+			bytes: Math.min(400, 100 + Math.floor(clock / 5_000) * 100),
+		}));
+		await expect(s.fetch()).rejects.toThrow(/stalled at 40% for 2 min/);
+		expect(s.deleted).toHaveLength(1);
+	});
+});
