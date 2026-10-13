@@ -264,7 +264,7 @@ services:
       start_period: 10s
 
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:v0.3.0
+    image: tecnativa/docker-socket-proxy:0.3.0
     restart: unless-stopped
     logging: *logging
     volumes:
