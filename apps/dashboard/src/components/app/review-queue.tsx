@@ -2,6 +2,9 @@
 
 import type { AppRouterClient } from "@lyterion/orpc";
 import {
+	Alert,
+	AlertDescription,
+	AlertTitle,
 	Badge,
 	Button,
 	cn,
@@ -131,9 +134,13 @@ export function ReviewQueue() {
 	};
 	const pick = useMutation({
 		...orpc.review.pick.mutationOptions(),
-		onSuccess: () => {
+		onSuccess: (_r, vars) => {
+			// Gone from the list at once; the refetch confirms, and a failed placement brings it back with the reason.
+			queryClient.setQueryData(orpc.review.list.queryKey(), (old) =>
+				old?.filter((i) => i.id !== vars.reviewId),
+			);
 			toast.success("Picked", {
-				description: `${item?.title}: it lands after verification.`,
+				description: `${item?.title}: placing it in the background.`,
 			});
 			return settle();
 		},
@@ -238,6 +245,9 @@ export function ReviewQueue() {
 									<span className="min-w-0 flex-1 truncate">
 										{it.artists.join(", ")}
 									</span>
+									{it.lastError && (
+										<span className="shrink-0 text-destructive">failed</span>
+									)}
 									<span className="shrink-0 tabular-nums">
 										{it.candidates.length}
 									</span>
@@ -266,6 +276,15 @@ export function ReviewQueue() {
 							{item.reason}
 						</Badge>
 					</div>
+					{item.lastError && (
+						<Alert variant="destructive">
+							<Icons.alertCircle />
+							<AlertTitle>The last pick couldn't be placed</AlertTitle>
+							<AlertDescription className="break-words font-mono">
+								{item.lastError}
+							</AlertDescription>
+						</Alert>
+					)}
 					<dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
 						<Meta label="Duration" value={mmss(item.durationMs)} />
 						<Meta label="ISRC" value={item.isrcs.join(", ")} />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { candidateSource } from "../source";
+import { candidateSource, pickState } from "../source";
 
 describe("candidateSource", () => {
 	it("links catalog sources and gives Soulseek something to copy", () => {
@@ -27,6 +27,26 @@ describe("candidateSource", () => {
 		expect(candidateSource("lidarr", "/downloads/a.flac")).toEqual({
 			url: null,
 			copy: "/downloads/a.flac",
+		});
+	});
+});
+
+describe("pickState", () => {
+	const now = 10 * 3600_000;
+	it("hides a fresh pick, shows a stale one, and surfaces a failure", () => {
+		expect(pickState(null, now)).toEqual({ hidden: false, lastError: null });
+		expect(pickState(`picking:7:${now - 60_000}`, now)).toEqual({
+			hidden: true,
+			lastError: null,
+		});
+		expect(pickState(`picking:7:${now - 3 * 3600_000}`, now).hidden).toBe(
+			false,
+		);
+		expect(
+			pickState("failed:picked file failed verification: corrupt", now),
+		).toEqual({
+			hidden: false,
+			lastError: "picked file failed verification: corrupt",
 		});
 	});
 });

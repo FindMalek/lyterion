@@ -600,3 +600,14 @@ named "Inter Variable" but never loaded it. Base size is 14px instead of 13,
 rows and titles grow with it. Still monochrome, `--radius: 0`, color only for
 status. Stat grids carry crosshair marks at their corners. Destructive or
 run-stopping actions confirm in a dialog instead of a second click.
+
+## D-053 A picked review item leaves the queue at once (2026-10-13)
+
+A pick only queues `review.resolve`, and the item stayed in the list until
+that task finished, behind the whole migration backlog on the shared
+`acquire` queue; a failed pick stayed with no reason. Now the pick marks
+the item `picking:<candidate>:<time>` in `review_item.resolution` (no
+migration) and the queue hides it, the task is triggered with
+`priority: 3600` so it runs ahead of bulk downloads, and a failure writes
+`failed:<reason>` so the item comes back with the reason shown. A pick
+older than 2 hours that never resolved (a crashed task) shows again.

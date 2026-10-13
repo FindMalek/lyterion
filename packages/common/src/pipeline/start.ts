@@ -21,10 +21,14 @@ function configureTrigger() {
 	});
 }
 
-export async function triggerTask(id: string, payload: unknown): Promise<void> {
+export async function triggerTask(
+	id: string,
+	payload: unknown,
+	options?: { priority?: number },
+): Promise<void> {
 	configureTrigger();
 	try {
-		await tasks.trigger(id, payload);
+		await tasks.trigger(id, payload, options);
 	} catch (err) {
 		throw new StartRunError(
 			`Trigger.dev refused ${id}: ${err instanceof Error ? err.message : String(err)}`,

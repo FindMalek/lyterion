@@ -7,19 +7,47 @@ import {
 	release,
 	reviewItem,
 } from "@lyterion/db/schema/library";
-import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
-import { candidateLabel, candidateSource } from "./source";
+import { candidateLabel, candidateSource, pickState } from "./source";
 
-export { candidateLabel, candidateSource };
+export { candidateLabel, candidateSource, pickState };
+
+/** Claims an open item for a pick; false when it's already resolved or being placed. */
+export async function markPicking(
+	reviewId: number,
+	candidateId: number,
+): Promise<boolean> {
+	const [row] = await db
+		.select({ resolution: reviewItem.resolution })
+		.from(reviewItem)
+		.where(and(eq(reviewItem.id, reviewId), isNull(reviewItem.resolvedAt)));
+	if (!row || pickState(row.resolution).hidden) return false;
+	await db
+		.update(reviewItem)
+		.set({ resolution: `picking:${candidateId}:${Date.now()}` })
+		.where(and(eq(reviewItem.id, reviewId), isNull(reviewItem.resolvedAt)));
+	return true;
+}
+
+/** Puts a failed pick back in the queue with the reason the owner sees. */
+export async function markPickFailed(
+	reviewId: number,
+	reason: string,
+): Promise<void> {
+	await db
+		.update(reviewItem)
+		.set({ resolution: `failed:${reason.slice(0, 500)}` })
+		.where(and(eq(reviewItem.id, reviewId), isNull(reviewItem.resolvedAt)));
+}
 
 /** Open review items, for the nav badge. */
 export async function openReviewCount(): Promise<number> {
-	const [row] = await db
-		.select({ n: count() })
+	const rows = await db
+		.select({ resolution: reviewItem.resolution })
 		.from(reviewItem)
 		.where(isNull(reviewItem.resolvedAt));
-	return row?.n ?? 0;
+	return rows.filter((r) => !pickState(r.resolution).hidden).length;
 }
 
 export async function openReviews() {
@@ -27,6 +55,7 @@ export async function openReviews() {
 		.select({
 			id: reviewItem.id,
 			reason: reviewItem.reason,
+			resolution: reviewItem.resolution,
 			createdAt: reviewItem.createdAt,
 			recordingId: recording.id,
 			title: recording.title,
@@ -38,7 +67,8 @@ export async function openReviews() {
 		.from(reviewItem)
 		.innerJoin(recording, eq(recording.id, reviewItem.recordingId))
 		.where(isNull(reviewItem.resolvedAt))
-		.orderBy(asc(reviewItem.createdAt));
+		.orderBy(asc(reviewItem.createdAt))
+		.then((rows) => rows.filter((r) => !pickState(r.resolution).hidden));
 	if (items.length === 0) return [];
 	const recordingIds = items.map((i) => i.recordingId);
 	const [candidates, releases] = await Promise.all([
@@ -58,8 +88,9 @@ export async function openReviews() {
 			),
 	]);
 	const albumOf = new Map(releases.map((r) => [r.id, r.title]));
-	return items.map((item) => ({
+	return items.map(({ resolution, ...item }) => ({
 		...item,
+		lastError: pickState(resolution).lastError,
 		album: item.placedReleaseIds[0]
 			? (albumOf.get(item.placedReleaseIds[0]) ?? null)
 			: null,
