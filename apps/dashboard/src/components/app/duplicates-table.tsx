@@ -1,8 +1,21 @@
 "use client";
 
+import {
+	Badge,
+	Button,
+	Icons,
+	Skeleton,
+	Table,
+	TableBody,
+	TableCell,
+	TableRow,
+} from "@lyterion/ui";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 
+import { EmptyState } from "@/components/shared/empty-state";
+import { Section } from "@/components/shared/section";
 import { orpc } from "@/shared/api/orpc";
 
 function mmss(ms: number) {
@@ -13,112 +26,159 @@ function mmss(ms: number) {
 export function DuplicatesTable() {
 	const { data } = useQuery(orpc.library.duplicates.queryOptions());
 	const [done, setDone] = useState<Set<string>>(new Set());
-	const [mergeFrom, setMergeFrom] = useState<string | null>(null);
+	const [mergeFrom, setMergeFrom] = useState<{
+		id: string;
+		title: string;
+	} | null>(null);
 	const override = useMutation({
 		...orpc.library.override.mutationOptions(),
-		onSuccess: (_r, vars) =>
+		onSuccess: (_r, vars) => {
 			setDone((d) =>
 				new Set(d).add(`${vars.kind}:${vars.trackA}:${vars.trackB}`),
-			),
+			);
+			toast.success(vars.kind === "merge" ? "Merge saved" : "Split saved", {
+				description: "Applies on the next run.",
+			});
+		},
+		onError: (err) => toast.error(err.message),
 	});
 
 	if (data && data.length === 0)
 		return (
-			<p className="px-3 py-3 text-muted-foreground text-xs">
-				No merged recordings. Every Spotify track is its own recording so far.
-			</p>
+			<EmptyState
+				icon={Icons.layers}
+				title="No merged recordings"
+				description="Every Spotify track is its own recording so far. Tracks that are the same song (a single and its album cut) appear here once a run groups them."
+			/>
 		);
 
 	return (
-		<section>
-			<p className="border-b px-3 py-2 text-muted-foreground text-xs">
-				Spotify tracks merged into one recording (one file, D-006). Split a
-				track out if it's a different version, or merge two recordings that are
-				the same song. Changes apply on the next run.
-				{mergeFrom && (
+		<Section
+			title="Merged recordings"
+			count={data?.length}
+			description={
+				mergeFrom ? (
 					<span className="text-foreground">
-						{" "}
-						Pick the recording to merge into, or press merge again to cancel.
+						Merging <span className="font-medium">{mergeFrom.title}</span>: pick
+						the recording to merge it into.
 					</span>
-				)}
-			</p>
-			{(data ?? []).map((group) => (
-				<div key={group.recordingId} className="border-b">
-					<div className="flex items-center justify-between bg-muted/40 px-3 py-1 text-xs">
-						<span className="font-medium">{group.title}</span>
-						<button
-							type="button"
-							className="font-mono text-muted-foreground hover:text-foreground"
-							onClick={() => {
-								const preferred = group.members[0]?.preferred;
-								if (!preferred) return;
-								if (!mergeFrom) return setMergeFrom(preferred);
-								if (mergeFrom !== preferred)
-									override.mutate({
-										kind: "merge",
-										trackA: mergeFrom,
-										trackB: preferred,
-									});
-								setMergeFrom(null);
-							}}
-						>
-							{mergeFrom === group.members[0]?.preferred
-								? "cancel merge"
-								: mergeFrom
-									? "merge into this"
-									: "merge…"}
-						</button>
-					</div>
-					<table className="w-full text-xs">
-						<tbody>
-							{group.members.map((m) => {
-								const key = `split:${[m.trackId, m.preferred].sort().join(":")}`;
-								return (
-									<tr key={m.trackId} className="border-t">
-										<td className="max-w-72 truncate px-3 py-1.5">{m.title}</td>
-										<td className="max-w-56 truncate px-3 py-1.5 text-muted-foreground">
-											{m.album ?? ""}
-										</td>
-										<td className="px-3 py-1.5 font-mono text-muted-foreground">
-											{mmss(m.durationMs)}
-										</td>
-										<td className="px-3 py-1.5 font-mono text-muted-foreground">
-											{m.isrc ?? ""}
-										</td>
-										<td className="px-3 py-1.5 font-mono">
-											{m.trackId === m.preferred
-												? "preferred"
-												: `via ${m.edge}`}
-										</td>
-										<td className="px-3 py-1.5 text-right">
-											{m.trackId !== m.preferred &&
-												(done.has(key) ? (
-													<span className="font-mono text-success">
-														split next run
-													</span>
-												) : (
-													<button
-														type="button"
-														className="font-mono text-muted-foreground hover:text-foreground"
-														onClick={() =>
-															override.mutate({
-																kind: "split",
-																trackA: m.trackId,
-																trackB: m.preferred,
-															})
-														}
-													>
-														split out
-													</button>
-												))}
-										</td>
-									</tr>
-								);
-							})}
-						</tbody>
-					</table>
+				) : (
+					"Spotify tracks grouped into one file (D-006). Split out a different version, or merge two recordings of the same song. Changes apply on the next run."
+				)
+			}
+			actions={
+				mergeFrom && (
+					<Button size="xs" variant="ghost" onClick={() => setMergeFrom(null)}>
+						Cancel merge
+					</Button>
+				)
+			}
+		>
+			{!data && (
+				<div className="flex flex-col gap-2 p-3">
+					<Skeleton className="h-4 w-full" />
+					<Skeleton className="h-4 w-2/3" />
 				</div>
-			))}
-		</section>
+			)}
+			{(data ?? []).map((group) => {
+				const preferred = group.members[0]?.preferred;
+				const isSource = mergeFrom?.id === preferred;
+				return (
+					<div key={group.recordingId} className="border-b last:border-b-0">
+						<div className="flex items-center justify-between gap-3 bg-muted/40 px-4 py-2">
+							<span className="truncate font-medium text-xs">
+								{group.title}
+							</span>
+							{preferred && (
+								<Button
+									size="xs"
+									variant={mergeFrom && !isSource ? "default" : "ghost"}
+									onClick={() => {
+										if (!mergeFrom)
+											return setMergeFrom({
+												id: preferred,
+												title: group.title,
+											});
+										if (!isSource)
+											override.mutate({
+												kind: "merge",
+												trackA: mergeFrom.id,
+												trackB: preferred,
+											});
+										setMergeFrom(null);
+									}}
+								>
+									{isSource
+										? "Cancel"
+										: mergeFrom
+											? "Merge into this"
+											: "Merge…"}
+								</Button>
+							)}
+						</div>
+						<Table>
+							<TableBody>
+								{group.members.map((m) => {
+									const key = `split:${m.trackId}:${m.preferred}`;
+									return (
+										<TableRow key={m.trackId}>
+											<TableCell className="max-w-72 truncate">
+												{m.title}
+											</TableCell>
+											<TableCell className="hidden max-w-56 truncate text-muted-foreground md:table-cell">
+												{m.album ?? ""}
+											</TableCell>
+											<TableCell className="w-14 font-mono text-muted-foreground tabular-nums">
+												{mmss(m.durationMs)}
+											</TableCell>
+											<TableCell className="hidden w-36 font-mono text-muted-foreground lg:table-cell">
+												{m.isrc ?? ""}
+											</TableCell>
+											<TableCell className="w-28">
+												{m.trackId === m.preferred ? (
+													<Badge
+														variant="outline"
+														className="font-mono font-normal"
+													>
+														preferred
+													</Badge>
+												) : (
+													<span className="font-mono text-muted-foreground">
+														via {m.edge}
+													</span>
+												)}
+											</TableCell>
+											<TableCell className="w-28 text-right">
+												{m.trackId !== m.preferred &&
+													(done.has(key) ? (
+														<span className="font-mono text-success">
+															splits next run
+														</span>
+													) : (
+														<Button
+															size="xs"
+															variant="ghost"
+															disabled={override.isPending}
+															onClick={() =>
+																override.mutate({
+																	kind: "split",
+																	trackA: m.trackId,
+																	trackB: m.preferred,
+																})
+															}
+														>
+															Split out
+														</Button>
+													))}
+											</TableCell>
+										</TableRow>
+									);
+								})}
+							</TableBody>
+						</Table>
+					</div>
+				);
+			})}
+		</Section>
 	);
 }

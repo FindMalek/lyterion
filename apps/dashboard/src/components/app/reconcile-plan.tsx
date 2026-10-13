@@ -1,9 +1,22 @@
 "use client";
 
-import { Button } from "@lyterion/ui";
+import {
+	Button,
+	Icons,
+	Skeleton,
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@lyterion/ui";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { toast } from "sonner";
 
+import { ConfirmAction } from "@/components/shared/confirm-action";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Section } from "@/components/shared/section";
 import { orpc } from "@/shared/api/orpc";
 
 function short(p: string) {
@@ -13,104 +26,118 @@ function short(p: string) {
 
 export function ReconcilePlan() {
 	const { data } = useQuery(orpc.library.reconcilePlan.queryOptions());
-	const [confirmRemove, setConfirmRemove] = useState(false);
-	const reconcile = useMutation(orpc.library.reconcile.mutationOptions());
-	if (!data) return null;
-	const nothing = data.moves.length === 0 && data.removals.length === 0;
+	const reconcile = useMutation({
+		...orpc.library.reconcile.mutationOptions(),
+		onSuccess: () =>
+			toast.success("Reconcile queued", {
+				description: "Playlists and Navidrome follow once it's done.",
+			}),
+		onError: (err) => toast.error(err.message),
+	});
+
+	if (!data)
+		return (
+			<div className="flex flex-col gap-2 p-3">
+				<Skeleton className="h-4 w-full" />
+				<Skeleton className="h-4 w-1/2" />
+			</div>
+		);
+	if (data.moves.length === 0 && data.removals.length === 0)
+		return (
+			<EmptyState
+				icon={Icons.circleCheck}
+				title="Nothing to reconcile"
+				description="Every file sits where its placement says, and every Lyterion file is still referenced."
+			/>
+		);
 
 	return (
-		<section>
-			<div className="flex flex-wrap items-center gap-3 border-b px-3 py-2 text-xs">
-				<span className="text-muted-foreground">
-					Dry run. Moves follow placement changes (a newly saved album, a
-					merge). Removals are Lyterion-owned files nothing on Spotify points at
-					anymore. Files outside lyterion/ are never touched.
-				</span>
-				<div className="ml-auto flex items-center gap-2">
-					<Button
-						size="sm"
-						variant="outline"
-						disabled={nothing || reconcile.isPending}
-						onClick={() => reconcile.mutate({ remove: false })}
-					>
-						apply {data.moves.length} moves
-					</Button>
-					<Button
-						size="sm"
-						variant="destructive"
-						disabled={data.removals.length === 0 || reconcile.isPending}
-						onBlur={() => setConfirmRemove(false)}
-						onClick={() => {
-							if (!confirmRemove) return setConfirmRemove(true);
-							setConfirmRemove(false);
-							reconcile.mutate({ remove: true });
-						}}
-					>
-						{confirmRemove
-							? `click again: delete ${data.removals.length} files`
-							: `moves + remove ${data.removals.length}`}
-					</Button>
-				</div>
-				{reconcile.error && (
-					<span className="w-full font-mono text-destructive">
-						{reconcile.error.message}
-					</span>
-				)}
-				{reconcile.isSuccess && (
-					<span className="w-full font-mono text-success">
-						queued, playlists and Navidrome follow when it's done
-					</span>
-				)}
-			</div>
-			{nothing && (
-				<p className="px-3 py-3 text-muted-foreground text-xs">
-					Nothing to reconcile, every file sits where its placement says.
-				</p>
-			)}
+		<>
+			<Section
+				title="Dry run"
+				description="Moves follow placement changes (a newly saved album, a merge). Removals are Lyterion-owned files nothing on Spotify points at anymore. Files outside lyterion/ are never touched."
+				actions={
+					<>
+						<Button
+							size="xs"
+							variant="outline"
+							disabled={data.moves.length === 0 || reconcile.isPending}
+							onClick={() => reconcile.mutate({ remove: false })}
+						>
+							Apply {data.moves.length} moves
+						</Button>
+						{data.removals.length > 0 && (
+							<ConfirmAction
+								trigger={
+									<Button
+										size="xs"
+										variant="destructive"
+										disabled={reconcile.isPending}
+									>
+										<Icons.trash />
+										Moves + remove {data.removals.length}
+									</Button>
+								}
+								title={`Delete ${data.removals.length} files?`}
+								description="These Lyterion-owned files aren't on Spotify anymore. They're deleted from disk along with their lyrics, and can only come back with a new run."
+								confirm={`Delete ${data.removals.length} files`}
+								destructive
+								onConfirm={() => reconcile.mutate({ remove: true })}
+							/>
+						)}
+					</>
+				}
+			/>
 			{data.moves.length > 0 && (
-				<table className="w-full text-xs">
-					<thead>
-						<tr className="border-b text-left text-muted-foreground">
-							<th className="h-7 px-3 font-normal">move</th>
-							<th className="h-7 px-3 font-normal">from</th>
-							<th className="h-7 px-3 font-normal">to</th>
-						</tr>
-					</thead>
-					<tbody>
-						{data.moves.map((m) => (
-							<tr key={m.fileId} className="border-b">
-								<td className="px-3 py-1.5">{m.title}</td>
-								<td className="max-w-96 truncate px-3 py-1.5 font-mono text-muted-foreground">
-									{short(m.from)}
-								</td>
-								<td className="max-w-96 truncate px-3 py-1.5 font-mono">
-									{short(m.to)}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
+				<Section title="Moves" count={data.moves.length}>
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Track</TableHead>
+								<TableHead>From</TableHead>
+								<TableHead>To</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{data.moves.map((m) => (
+								<TableRow key={m.fileId}>
+									<TableCell className="max-w-56 truncate">{m.title}</TableCell>
+									<TableCell className="max-w-96 truncate font-mono text-muted-foreground">
+										{short(m.from)}
+									</TableCell>
+									<TableCell className="max-w-96 truncate font-mono">
+										{short(m.to)}
+									</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+					</Table>
+				</Section>
 			)}
 			{data.removals.length > 0 && (
-				<table className="w-full text-xs">
-					<thead>
-						<tr className="border-b text-left text-muted-foreground">
-							<th className="h-7 px-3 font-normal">unreferenced</th>
-							<th className="h-7 px-3 font-normal">file</th>
-						</tr>
-					</thead>
-					<tbody>
-						{data.removals.map((r) => (
-							<tr key={r.fileId} className="border-b">
-								<td className="px-3 py-1.5">{r.title ?? "(recording gone)"}</td>
-								<td className="max-w-[40rem] truncate px-3 py-1.5 font-mono text-warning">
-									{short(r.path)}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
+				<Section title="Unreferenced" count={data.removals.length}>
+					<Table>
+						<TableHeader>
+							<TableRow>
+								<TableHead>Track</TableHead>
+								<TableHead>File</TableHead>
+							</TableRow>
+						</TableHeader>
+						<TableBody>
+							{data.removals.map((r) => (
+								<TableRow key={r.fileId}>
+									<TableCell className="max-w-56 truncate">
+										{r.title ?? "(recording gone)"}
+									</TableCell>
+									<TableCell className="max-w-[40rem] truncate font-mono text-warning">
+										{short(r.path)}
+									</TableCell>
+								</TableRow>
+							))}
+						</TableBody>
+					</Table>
+				</Section>
 			)}
-		</section>
+		</>
 	);
 }

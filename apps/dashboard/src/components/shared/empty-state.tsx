@@ -1,66 +1,42 @@
 import type { Icon } from "@lyterion/ui";
-import { Button, cn, Icons } from "@lyterion/ui";
+import {
+	cn,
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+	Icons,
+} from "@lyterion/ui";
+import type * as React from "react";
 
-type EmptyStateProps = {
+type Props = {
 	icon?: Icon;
 	title: string;
-	description?: string;
-	action?: {
-		label: string;
-		onClick: () => void;
-	};
-	variant?: "minimal" | "card";
+	description?: React.ReactNode;
+	children?: React.ReactNode;
 	className?: string;
 };
 
+/** What a page or section shows when there's nothing yet: why, and what makes something appear. */
 export function EmptyState({
 	icon: Icon = Icons.music,
 	title,
 	description,
-	action,
-	variant = "minimal",
+	children,
 	className,
-}: EmptyStateProps) {
-	const content = (
-		<>
-			<Icon className="size-10 shrink-0 text-muted-foreground" />
-			<div className="flex flex-col gap-1">
-				<p className="font-medium text-foreground text-sm">{title}</p>
-				{description && (
-					<p className="text-muted-foreground text-xs">{description}</p>
-				)}
-				{action && (
-					<Button
-						variant="outline"
-						size="sm"
-						className="mt-2 w-fit"
-						onClick={action.onClick}
-					>
-						{action.label}
-					</Button>
-				)}
-			</div>
-		</>
-	);
-
-	if (variant === "card") {
-		return (
-			<div
-				className={cn(
-					"flex items-start gap-4 rounded-none border p-6",
-					className,
-				)}
-			>
-				{content}
-			</div>
-		);
-	}
-
+}: Props) {
 	return (
-		<div
-			className={cn("flex items-start gap-3 text-muted-foreground", className)}
-		>
-			{content}
-		</div>
+		<Empty className={cn("py-10", className)}>
+			<EmptyHeader>
+				<EmptyMedia variant="icon">
+					<Icon />
+				</EmptyMedia>
+				<EmptyTitle>{title}</EmptyTitle>
+				{description && <EmptyDescription>{description}</EmptyDescription>}
+			</EmptyHeader>
+			{children && <EmptyContent>{children}</EmptyContent>}
+		</Empty>
 	);
 }

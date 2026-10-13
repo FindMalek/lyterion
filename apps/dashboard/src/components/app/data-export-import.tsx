@@ -1,9 +1,12 @@
 "use client";
 
+import { cn, Icons } from "@lyterion/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { strFromU8, unzipSync } from "fflate";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 
+import { Section } from "@/components/shared/section";
 import { formatDateTime } from "@/lib/status";
 import { orpc } from "@/shared/api/orpc";
 
@@ -30,88 +33,132 @@ async function readExport(fileList: FileList): Promise<Record<string, string>> {
 
 export function DataExportImport() {
 	const queryClient = useQueryClient();
+	const input = useRef<HTMLInputElement>(null);
+	const [dragging, setDragging] = useState(false);
+	const [reading, setReading] = useState(false);
 	const imports = useQuery({
 		...orpc.runs.imports.queryOptions(),
 		refetchInterval: 5_000,
 		meta: { silent: true },
 	});
-	const [readError, setReadError] = useState<string | null>(null);
 	const upload = useMutation({
 		...orpc.runs.importDataExport.mutationOptions(),
-		onSuccess: () =>
-			queryClient.invalidateQueries({ queryKey: orpc.runs.imports.key() }),
+		onSuccess: (r) => {
+			toast.success("Importing your data export", {
+				description: `${r.playlists} playlists, ${r.items} entries, ${r.liked} likes`,
+			});
+			return queryClient.invalidateQueries({
+				queryKey: orpc.runs.imports.key(),
+			});
+		},
+		onError: (err) =>
+			toast.error("Upload failed", { description: err.message }),
 	});
 
+	async function take(files: FileList | null) {
+		if (!files?.length) return;
+		setReading(true);
+		try {
+			const read = await readExport(files);
+			if (Object.keys(read).length === 0)
+				return toast.error("Nothing to import", {
+					description: "No Playlist*.json or YourLibrary.json in that upload.",
+				});
+			upload.mutate({ files: read });
+		} catch (err) {
+			toast.error("Couldn't read that file", {
+				description: err instanceof Error ? err.message : String(err),
+			});
+		} finally {
+			setReading(false);
+		}
+	}
+
+	const busy = reading || upload.isPending;
+
 	return (
-		<section className="border-t">
-			<div className="flex h-8 items-center border-b px-3">
-				<h2 className="font-medium text-xs uppercase tracking-wide">
-					Spotify data export
-				</h2>
-			</div>
-			<div className="flex flex-col gap-2 px-3 py-2 text-xs">
-				<p className="text-muted-foreground">
-					Playlists the API hides in dev mode (mostly ones you follow) can come
-					from Spotify's "Download your data" export (Account data). Drop the
-					zip here; only the playlist and library JSON leave your browser.
-				</p>
+		<Section
+			title="Spotify data export"
+			description="Playlists the API hides in dev mode (mostly ones you follow) can come from Spotify's “Download your data” export. Only the playlist and library JSON leave your browser."
+		>
+			<div className="p-3">
+				<button
+					type="button"
+					disabled={busy}
+					onClick={() => input.current?.click()}
+					onDragOver={(e) => {
+						e.preventDefault();
+						setDragging(true);
+					}}
+					onDragLeave={() => setDragging(false)}
+					onDrop={(e) => {
+						e.preventDefault();
+						setDragging(false);
+						take(e.dataTransfer.files);
+					}}
+					className={cn(
+						"flex w-full flex-col items-center justify-center gap-2 border border-dashed px-4 py-8 text-center transition-colors",
+						"hover:border-foreground/40 hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-60",
+						dragging && "border-foreground bg-muted/60",
+					)}
+				>
+					{busy ? (
+						<Icons.spinner className="size-5 animate-spin text-muted-foreground" />
+					) : (
+						<Icons.upload className="size-5 text-muted-foreground" />
+					)}
+					<span className="text-xs">
+						{busy
+							? "Reading the export…"
+							: "Drop my_spotify_data.zip here, or click to choose"}
+					</span>
+					<span className="font-mono text-[11px] text-muted-foreground">
+						.zip or Playlist*.json · YourLibrary.json
+					</span>
+				</button>
 				<input
+					ref={input}
 					type="file"
 					accept=".zip,.json"
 					multiple
-					className="font-mono text-xs file:mr-3 file:border file:bg-background file:px-2 file:py-1 file:font-mono file:text-xs"
-					onChange={async (e) => {
-						setReadError(null);
-						if (!e.target.files?.length) return;
-						try {
-							const files = await readExport(e.target.files);
-							if (Object.keys(files).length === 0)
-								return setReadError(
-									"no Playlist*.json or YourLibrary.json in that upload",
-								);
-							upload.mutate({ files });
-						} catch (err) {
-							setReadError(err instanceof Error ? err.message : String(err));
-						}
+					className="sr-only"
+					onChange={(e) => {
+						take(e.target.files);
+						e.target.value = "";
 					}}
 				/>
-				{(readError ?? upload.error?.message) && (
-					<span className="font-mono text-destructive">
-						{readError ?? upload.error?.message}
-					</span>
-				)}
-				{upload.data && (
-					<span className="font-mono text-success">
-						read {upload.data.playlists} playlists, {upload.data.items} entries,{" "}
-						{upload.data.liked} likes; importing
-					</span>
-				)}
-				{(imports.data ?? []).map((i) => (
-					<div
-						key={i.id}
-						className="flex flex-wrap items-center gap-3 font-mono text-muted-foreground"
-					>
-						<StatusLabel
-							status={
-								i.status === "done"
-									? "ok"
-									: i.status === "failed"
-										? "error"
-										: "active"
-							}
-							label={i.status}
-						/>
-						<span>{formatDateTime(i.uploadedAt)} utc</span>
-						{i.summary && (
-							<span>
-								{Object.entries(i.summary)
-									.map(([k, v]) => `${k} ${String(v)}`)
-									.join(" · ")}
-							</span>
-						)}
-					</div>
-				))}
 			</div>
-		</section>
+			{(imports.data ?? []).length > 0 && (
+				<ul className="divide-y border-t">
+					{(imports.data ?? []).map((i) => (
+						<li
+							key={i.id}
+							className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-[13px]"
+						>
+							<StatusLabel
+								status={
+									i.status === "done"
+										? "ok"
+										: i.status === "failed"
+											? "error"
+											: "active"
+								}
+								label={i.status}
+							/>
+							<span className="font-mono text-muted-foreground">
+								{formatDateTime(i.uploadedAt)} utc
+							</span>
+							{i.summary && (
+								<span className="font-mono text-muted-foreground">
+									{Object.entries(i.summary)
+										.map(([k, v]) => `${k} ${String(v)}`)
+										.join(" · ")}
+								</span>
+							)}
+						</li>
+					))}
+				</ul>
+			)}
+		</Section>
 	);
 }

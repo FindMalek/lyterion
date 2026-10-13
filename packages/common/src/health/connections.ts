@@ -21,6 +21,8 @@ export type ConnectionStatus = {
 	id: ConnectionId;
 	label: string;
 	configured: boolean;
+	// Done as far as setup goes, whatever the live check says: Spotify counts only once the owner signed in.
+	setUp: boolean;
 	ok: boolean | null;
 	latencyMs: number | null;
 	detail: string | null;
@@ -283,16 +285,18 @@ export async function checkConnections(
 
 	return Promise.all(
 		rows.map(async ([id, label, configured, probe]) => {
+			const setUp = id === "spotify" ? env.spotifyLinked : configured;
 			if (!configured || !probe)
 				return {
 					id,
 					label,
 					configured,
+					setUp,
 					ok: configured ? null : false,
 					latencyMs: null,
 					detail: null,
 				};
-			return { id, label, configured, ...(await timed(probe)) };
+			return { id, label, configured, setUp, ...(await timed(probe)) };
 		}),
 	);
 }

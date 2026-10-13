@@ -1,60 +1,70 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { connectionState, runState } from "@/lib/status";
+
+import { Stat, StatGrid } from "@/components/shared/stat";
+import { connectionState, formatBytes } from "@/lib/status";
 import { orpc } from "@/shared/api/orpc";
 
-import { StatusLabel } from "./status-dot";
-
-function Tile({
-	label,
-	children,
-}: {
-	label: string;
-	children: React.ReactNode;
-}) {
-	return (
-		<div className="flex flex-col gap-1 px-3 py-2">
-			<span className="font-mono text-[11px] text-muted-foreground">
-				{label}
-			</span>
-			<span className="font-mono text-sm">{children}</span>
-		</div>
-	);
-}
-
+// The four numbers worth a glance: what's in Navidrome, what's missing, what waits on you, and whether every service is up.
 export function OverviewStats() {
-	const connections = useQuery(orpc.connections.list.queryOptions());
-	const runs = useQuery({
-		...orpc.runs.list.queryOptions(),
+	const report = useQuery({
+		...orpc.library.report.queryOptions(),
+		refetchInterval: 30_000,
 		meta: { silent: true },
 	});
-
+	const connections = useQuery(orpc.connections.list.queryOptions());
+	const r = report.data;
+	const inLibrary = r
+		? (r.byStatus.placed ?? 0) +
+			(r.byStatus.linked ?? 0) +
+			(r.byStatus.existing ?? 0)
+		: undefined;
+	const total = r
+		? Object.values(r.byStatus).reduce((a, b) => a + Number(b), 0)
+		: 0;
+	const missing = r ? (r.byStatus.missing ?? 0) : undefined;
+	const review = r ? (r.byStatus.review ?? 0) : undefined;
 	const rows = connections.data ?? [];
-	const ready = rows.filter((r) => connectionState(r).status === "ok").length;
-	const down = rows.filter((r) => connectionState(r).status === "error").length;
-	const last = runs.data?.[0];
+	const down = rows.filter((c) => connectionState(c).status === "error");
+	const ready = rows.filter((c) => connectionState(c).status === "ok").length;
 
 	return (
-		<div className="grid grid-cols-2 divide-x divide-y border-b sm:grid-cols-4 sm:divide-y-0">
-			<Tile label="services ready">
-				{connections.data ? `${ready}/${rows.length}` : "…"}
-			</Tile>
-			<Tile label="services down">
-				<span className={down > 0 ? "text-destructive" : undefined}>
-					{connections.data ? down : "…"}
-				</span>
-			</Tile>
-			<Tile label="runs">{runs.data ? runs.data.length : "…"}</Tile>
-			<Tile label="last run">
-				{last ? (
-					<StatusLabel {...runState(last)} />
-				) : runs.data ? (
-					"none yet"
-				) : (
-					"…"
-				)}
-			</Tile>
-		</div>
+		<StatGrid>
+			<Stat
+				label="In library"
+				value={inLibrary?.toLocaleString()}
+				hint={
+					r &&
+					`of ${total.toLocaleString()} · ${formatBytes(r.bytes) || "0MB"} · ${r.byQuality.lossless.toLocaleString()} lossless`
+				}
+				href="/library"
+			/>
+			<Stat
+				label="Missing"
+				value={missing?.toLocaleString()}
+				tone={missing ? "error" : undefined}
+				hint="no source had a file that passed"
+				href="/providers"
+			/>
+			<Stat
+				label="To review"
+				value={review?.toLocaleString()}
+				tone={review ? "warn" : undefined}
+				hint={review ? "pick or skip each one" : "nothing waiting"}
+				href="/review"
+			/>
+			<Stat
+				label="Services"
+				value={connections.data ? `${ready}/${rows.length}` : undefined}
+				tone={down.length ? "error" : undefined}
+				hint={
+					down.length
+						? `down: ${down.map((c) => c.label).join(", ")}`
+						: "all reachable"
+				}
+				href="/connections"
+			/>
+		</StatGrid>
 	);
 }

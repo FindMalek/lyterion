@@ -29,7 +29,7 @@ export function CopyableError({
 		<div
 			className={cn(
 				"flex items-start justify-between gap-2",
-				variant === "error" ? "text-destructive" : "text-yellow-600",
+				variant === "error" ? "text-destructive" : "text-warning",
 				className,
 			)}
 		>

@@ -7,7 +7,7 @@ export default function PlaylistsPage() {
 		<>
 			<PageHeader
 				title="Playlists"
-				description="m3u8 files written into the library, with sidecar covers"
+				description="every Spotify playlist, rebuilt in Navidrome with its order and cover"
 			/>
 			<PlaylistsTable />
 			<DataExportImport />

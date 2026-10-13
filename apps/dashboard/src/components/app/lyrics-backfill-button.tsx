@@ -18,14 +18,14 @@ export function LyricsBackfillButton() {
 	});
 	return (
 		<Button
-			size="xs"
+			size="sm"
 			variant="outline"
 			isLoading={backfill.isPending}
 			disabled={backfill.isSuccess}
 			onClick={() => backfill.mutate({})}
 		>
 			{!backfill.isPending && <Icons.fileText />}
-			{backfill.isSuccess ? "lyrics queued" : "fetch lyrics"}
+			{backfill.isSuccess ? "Lyrics queued" : "Fetch lyrics"}
 		</Button>
 	);
 }

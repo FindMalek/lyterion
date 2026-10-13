@@ -9,7 +9,7 @@ export default function ConnectionsPage() {
 		<>
 			<PageHeader
 				title="Connections"
-				description="every service lyterion talks to, checked live. credentials are encrypted in the database"
+				description="every service Lyterion talks to, checked live · credentials are encrypted in the database"
 			/>
 			<Suspense>
 				<ConnectionsTable />

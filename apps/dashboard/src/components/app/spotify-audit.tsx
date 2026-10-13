@@ -3,6 +3,7 @@
 import type { AppRouterClient } from "@lyterion/orpc";
 import {
 	Button,
+	Icons,
 	Table,
 	TableBody,
 	TableCell,
@@ -12,6 +13,7 @@ import {
 } from "@lyterion/ui";
 import { useMutation } from "@tanstack/react-query";
 
+import { Section } from "@/components/shared/section";
 import { orpc } from "@/shared/api/orpc";
 
 import { type Status, StatusLabel } from "./status-dot";
@@ -37,63 +39,54 @@ export function SpotifyAudit() {
 	const audit = useMutation(orpc.connections.spotifyAudit.mutationOptions());
 
 	return (
-		<section className="border-t">
-			<div className="flex h-8 items-center justify-between border-b px-3">
-				<h2 className="font-medium text-xs uppercase tracking-wide">
-					Spotify endpoint audit
-				</h2>
+		<Section
+			title="Spotify endpoint audit"
+			description="Calls every endpoint the export uses once, with your app and token: which ones dev mode still allows, and whether tracks carry an ISRC."
+			actions={
 				<Button
-					size="sm"
+					size="xs"
 					variant="outline"
-					className="h-6 text-xs"
 					isLoading={audit.isPending}
 					onClick={() => audit.mutate({})}
 				>
-					run
+					{!audit.isPending && <Icons.play />}
+					Run audit
 				</Button>
-			</div>
-			{!audit.data && !audit.error && (
-				<p className="px-3 py-2 text-muted-foreground text-xs">
-					Calls every endpoint the export uses once, with your app and token,
-					and shows which ones dev mode still allows and whether tracks carry an
-					ISRC.
-				</p>
-			)}
+			}
+		>
 			{audit.error && (
-				<p className="px-3 py-2 font-mono text-destructive text-xs">
+				<p className="px-4 py-2 font-mono text-destructive text-xs">
 					{audit.error.message}
 				</p>
 			)}
 			{audit.data && (
-				<Table className="text-xs">
+				<Table>
 					<TableHeader>
 						<TableRow>
-							<TableHead className="h-7 w-44 px-3">endpoint</TableHead>
-							<TableHead className="h-7 w-32 px-3">result</TableHead>
-							<TableHead className="h-7 w-16 px-3">ids</TableHead>
-							<TableHead className="h-7 w-16 px-3 text-right">ms</TableHead>
-							<TableHead className="h-7 px-3">detail</TableHead>
+							<TableHead className="w-48">Endpoint</TableHead>
+							<TableHead className="w-32">Result</TableHead>
+							<TableHead className="w-16">Ids</TableHead>
+							<TableHead className="w-16 text-right">ms</TableHead>
+							<TableHead className="hidden md:table-cell">Detail</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
 						{audit.data.map((row) => (
 							<TableRow key={row.name}>
-								<TableCell className="px-3 py-1.5">
+								<TableCell>
 									<div>{row.name}</div>
 									<div className="font-mono text-[11px] text-muted-foreground">
 										{row.path}
 									</div>
 								</TableCell>
-								<TableCell className="px-3 py-1.5">
+								<TableCell>
 									<StatusLabel {...rowState(row)} />
 								</TableCell>
-								<TableCell className="px-3 py-1.5 font-mono">
-									{row.ids ?? ""}
-								</TableCell>
-								<TableCell className="px-3 py-1.5 text-right font-mono text-muted-foreground">
+								<TableCell className="font-mono">{row.ids ?? ""}</TableCell>
+								<TableCell className="text-right font-mono text-muted-foreground tabular-nums">
 									{row.ms ?? ""}
 								</TableCell>
-								<TableCell className="max-w-0 truncate px-3 py-1.5 font-mono text-muted-foreground">
+								<TableCell className="hidden max-w-0 truncate font-mono text-muted-foreground md:table-cell">
 									{row.note ?? ""}
 								</TableCell>
 							</TableRow>
@@ -101,6 +94,6 @@ export function SpotifyAudit() {
 					</TableBody>
 				</Table>
 			)}
-		</section>
+		</Section>
 	);
 }

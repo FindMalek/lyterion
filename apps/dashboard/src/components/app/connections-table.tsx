@@ -1,6 +1,10 @@
 "use client";
 
 import {
+	Button,
+	Icons,
+	Sheet,
+	Skeleton,
 	Table,
 	TableBody,
 	TableCell,
@@ -9,8 +13,10 @@ import {
 	TableRow,
 } from "@lyterion/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
-import { Fragment, useState } from "react";
+import type { Route } from "next";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+import { Section } from "@/components/shared/section";
 import {
 	CONNECTION_GROUPS,
 	type ConnectionRow,
@@ -18,13 +24,13 @@ import {
 } from "@/lib/status";
 import { orpc } from "@/shared/api/orpc";
 
-import { CredentialForm, type CredentialFormSpec } from "./credential-form";
+import { CredentialForm } from "./credential-form";
 import { StatusLabel } from "./status-dot";
 
-// Services without a form are configured by the deploy (spotify via sign-in, trigger and yt-dlp by env).
-const DEPLOY_NOTE: Record<string, string> = {
+// Services without a form: Spotify through sign-in, the rest by the deploy.
+const NO_FORM: Record<string, string> = {
 	spotify: "sign-in",
-	youtube: "deploy env",
+	youtube: "always on",
 	trigger: "deploy env",
 };
 
@@ -36,136 +42,114 @@ export function ConnectionsTable() {
 	const formById = new Map(
 		(forms.data ?? []).map((f) => [f.kind as string, f]),
 	);
-	const [editing, setEditing] = useState<string | null>(
-		useSearchParams().get("edit"),
-	);
 	const byId = new Map<string, ConnectionRow>(
 		(data ?? []).map((row) => [row.id, row]),
 	);
+	// The open form lives in the URL, so the setup checklist can link straight to it.
+	const params = useSearchParams();
+	const router = useRouter();
+	const pathname = usePathname();
+	const editing = params.get("edit");
+	const form = editing ? formById.get(editing) : undefined;
+	const setEditing = (id: string | null) =>
+		router.replace((id ? `${pathname}?edit=${id}` : pathname) as Route, {
+			scroll: false,
+		});
 
-	return (
-		<section>
-			<div className="flex h-8 items-center justify-between border-b px-3">
-				<h2 className="font-medium text-xs uppercase tracking-wide">
-					Services
-				</h2>
-				<button
-					type="button"
-					className="font-mono text-muted-foreground text-xs hover:text-foreground"
-					onClick={() => refetch()}
-				>
-					{isFetching ? "checking…" : "recheck"}
-				</button>
-			</div>
-			<Table className="text-xs">
-				<TableHeader>
-					<TableRow>
-						<TableHead className="h-7 w-48 px-3">service</TableHead>
-						<TableHead className="h-7 w-36 px-3">status</TableHead>
-						<TableHead className="h-7 w-20 px-3 text-right">latency</TableHead>
-						<TableHead className="h-7 px-3">detail</TableHead>
-						<TableHead className="h-7 w-20 px-3 text-right" />
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{CONNECTION_GROUPS.map((group) => (
-						<GroupRows
-							key={group.title}
-							title={group.title}
-							rows={group.ids.flatMap((id) => byId.get(id) ?? [])}
-							loading={!data}
-							forms={formById}
-							editing={editing}
-							onEdit={setEditing}
-						/>
-					))}
-				</TableBody>
-			</Table>
-		</section>
-	);
-}
-
-function GroupRows({
-	title,
-	rows,
-	loading,
-	forms,
-	editing,
-	onEdit,
-}: {
-	title: string;
-	rows: ConnectionRow[];
-	loading: boolean;
-	forms: Map<string, CredentialFormSpec>;
-	editing: string | null;
-	onEdit: (id: string | null) => void;
-}) {
 	return (
 		<>
-			<TableRow className="hover:bg-transparent">
-				<TableCell
-					colSpan={5}
-					className="bg-muted/40 px-3 py-1 font-mono text-[11px] text-muted-foreground"
-				>
-					{title.toLowerCase()}
-				</TableCell>
-			</TableRow>
-			{loading && (
-				<TableRow>
-					<TableCell
-						colSpan={5}
-						className="px-3 py-1.5 font-mono text-muted-foreground"
-					>
-						checking…
-					</TableCell>
-				</TableRow>
-			)}
-			{rows.map((row) => {
-				const form = forms.get(row.id);
-				const open = editing === row.id && form;
+			{CONNECTION_GROUPS.map((group, gi) => {
+				const rows = group.ids.flatMap((id) => byId.get(id) ?? []);
+				const ready = rows.filter(
+					(r) => connectionState(r).status === "ok",
+				).length;
 				return (
-					<Fragment key={row.id}>
-						<TableRow data-state={open ? "selected" : undefined}>
-							<TableCell className="px-3 py-1.5">{row.label}</TableCell>
-							<TableCell className="px-3 py-1.5">
-								<StatusLabel {...connectionState(row)} />
-							</TableCell>
-							<TableCell className="px-3 py-1.5 text-right font-mono text-muted-foreground">
-								{row.latencyMs === null ? "" : `${row.latencyMs}ms`}
-							</TableCell>
-							<TableCell className="max-w-0 truncate px-3 py-1.5 font-mono text-muted-foreground">
-								{row.detail ?? ""}
-							</TableCell>
-							<TableCell className="px-3 py-1.5 text-right">
-								{form ? (
-									<button
-										type="button"
-										className="font-mono text-muted-foreground text-xs hover:text-foreground"
-										onClick={() => onEdit(open ? null : row.id)}
-									>
-										{open ? "close" : row.configured ? "edit" : "set up"}
-									</button>
-								) : (
-									<span className="font-mono text-muted-foreground/60 text-xs">
-										{DEPLOY_NOTE[row.id] ?? ""}
-									</span>
-								)}
-							</TableCell>
-						</TableRow>
-						{open && (
-							<TableRow className="hover:bg-transparent">
-								<TableCell colSpan={5} className="whitespace-normal p-0">
-									<CredentialForm
-										key={form.kind}
-										form={form}
-										onClose={() => onEdit(null)}
-									/>
-								</TableCell>
-							</TableRow>
-						)}
-					</Fragment>
+					<Section
+						key={group.title}
+						title={group.title}
+						count={data ? `${ready}/${rows.length}` : undefined}
+						actions={
+							gi === 0 && (
+								<Button
+									size="xs"
+									variant="ghost"
+									onClick={() => refetch()}
+									isLoading={isFetching}
+								>
+									{!isFetching && <Icons.refresh />}
+									Recheck
+								</Button>
+							)
+						}
+					>
+						<Table>
+							<TableHeader className="sr-only">
+								<TableRow>
+									<TableHead>Service</TableHead>
+									<TableHead>Status</TableHead>
+									<TableHead>Latency</TableHead>
+									<TableHead>Detail</TableHead>
+									<TableHead>Action</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{!data &&
+									group.ids.map((id) => (
+										<TableRow key={id}>
+											<TableCell colSpan={5}>
+												<Skeleton className="h-4 w-full" />
+											</TableCell>
+										</TableRow>
+									))}
+								{rows.map((row) => {
+									const hasForm = formById.has(row.id);
+									return (
+										<TableRow key={row.id}>
+											<TableCell className="w-44 font-medium">
+												{row.label}
+											</TableCell>
+											<TableCell className="w-32">
+												<StatusLabel {...connectionState(row)} />
+											</TableCell>
+											<TableCell className="hidden w-20 text-right font-mono text-muted-foreground tabular-nums sm:table-cell">
+												{row.latencyMs === null ? "" : `${row.latencyMs}ms`}
+											</TableCell>
+											<TableCell className="hidden max-w-0 truncate font-mono text-muted-foreground md:table-cell">
+												{row.detail ?? ""}
+											</TableCell>
+											<TableCell className="w-24 text-right">
+												{hasForm ? (
+													<Button
+														size="xs"
+														variant={row.configured ? "ghost" : "outline"}
+														onClick={() => setEditing(row.id)}
+													>
+														{row.configured ? "Edit" : "Set up"}
+													</Button>
+												) : (
+													<span className="font-mono text-[11px] text-muted-foreground">
+														{NO_FORM[row.id] ?? ""}
+													</span>
+												)}
+											</TableCell>
+										</TableRow>
+									);
+								})}
+							</TableBody>
+						</Table>
+					</Section>
 				);
 			})}
+			<Sheet open={!!form} onOpenChange={(open) => !open && setEditing(null)}>
+				{form && (
+					<CredentialForm
+						key={form.kind}
+						form={form}
+						row={byId.get(form.kind)}
+						onClose={() => setEditing(null)}
+					/>
+				)}
+			</Sheet>
 		</>
 	);
 }

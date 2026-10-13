@@ -1,6 +1,6 @@
 "use client";
 
-import { buttonVariants } from "@lyterion/ui";
+import { buttonVariants, Sheet } from "@lyterion/ui";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
@@ -57,9 +57,18 @@ export function ServicesStep() {
 									<span className="font-mono text-muted-foreground">…</span>
 								)}
 							</button>
-							{open === id && form && (
-								<CredentialForm form={form} onClose={() => setOpen(null)} />
-							)}
+							<Sheet
+								open={open === id && !!form}
+								onOpenChange={(o) => !o && setOpen(null)}
+							>
+								{open === id && form && (
+									<CredentialForm
+										form={form}
+										row={row ?? undefined}
+										onClose={() => setOpen(null)}
+									/>
+								)}
+							</Sheet>
 						</li>
 					);
 				})}

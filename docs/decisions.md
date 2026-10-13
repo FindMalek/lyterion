@@ -588,3 +588,15 @@ still queued after 3 minutes, or stops moving for 2, is cancelled in slskd
 and the next candidate is tried; the hard cap drops to 20 minutes. Search
 pacing (one slskd search every 5s) is unchanged, so the ceiling is about 12
 tracks a minute.
+
+## D-051 Dashboard v2: Geist, 14px, the kit everywhere (2026-10-13, amends D-015)
+
+Malek found the dashboard too small and inconsistent. Every screen now builds
+from the `@lyterion/ui` kit (sidebar, tables, sheets, dialogs, toggle groups,
+tooltips) through a handful of shared parts: PageHeader, PageTabs, Section,
+Stat, StatusBadge, EmptyState, ConfirmAction. Type is Geist for text and Geist
+Mono for every number, id and path, loaded with `next/font`; the old theme
+named "Inter Variable" but never loaded it. Base size is 14px instead of 13,
+rows and titles grow with it. Still monochrome, `--radius: 0`, color only for
+status. Stat grids carry crosshair marks at their corners. Destructive or
+run-stopping actions confirm in a dialog instead of a second click.

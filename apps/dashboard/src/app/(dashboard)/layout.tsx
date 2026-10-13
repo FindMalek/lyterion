@@ -1,3 +1,5 @@
+import { SidebarInset, SidebarProvider } from "@lyterion/ui";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
@@ -14,10 +16,13 @@ export default async function DashboardLayout({
 		redirect("/login");
 	}
 
+	// The kit's sidebar remembers expanded/collapsed in this cookie, so the first paint already matches.
+	const open = (await cookies()).get("sidebar_state")?.value !== "false";
+
 	return (
-		<div className="flex min-h-svh flex-col md:h-svh md:flex-row">
+		<SidebarProvider defaultOpen={open}>
 			<AppSidebar userName={session.user.name} />
-			<main className="min-w-0 flex-1 overflow-auto">{children}</main>
-		</div>
+			<SidebarInset className="min-w-0">{children}</SidebarInset>
+		</SidebarProvider>
 	);
 }
