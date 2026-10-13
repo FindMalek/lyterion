@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
 	albumLoudnessArgs,
 	fetchLyrics,
+	firstArtist,
 	lrcPath,
 	parseEbur128,
 	replayGainTags,
+	sameSong,
 } from "../extras";
 
 const STDERR = `[Parsed_ebur128_0 @ 0x1] t: 1.0  M: -20.1 S:-120.7 I: -20.1 LUFS LRA: 0.0 LU
@@ -77,5 +79,158 @@ describe("album gain", () => {
 			REPLAYGAIN_ALBUM_GAIN: ["7.00 dB"],
 			REPLAYGAIN_ALBUM_PEAK: ["0.211349"],
 		});
+	});
+});
+
+describe("lyrics lookup order", () => {
+	const q = {
+		artist: "Massive Attack",
+		title: "Teardrop",
+		album: "Mezzanine (Deluxe Edition)",
+		durationMs: 330_000,
+	};
+
+	function lrclib(routes: Record<string, unknown>) {
+		const urls: string[] = [];
+		const doFetch = (async (input: string) => {
+			urls.push(input);
+			const url = new URL(input);
+			const key =
+				url.pathname === "/api/search"
+					? "search"
+					: url.searchParams.has("album_name")
+						? "get+album"
+						: "get";
+			const body = routes[key];
+			return body === undefined
+				? Response.json({}, { status: 404 })
+				: Response.json(body);
+		}) as unknown as typeof fetch;
+		return { doFetch, urls };
+	}
+
+	it("retries without the album when the exact match misses", async () => {
+		const { doFetch, urls } = lrclib({ get: { syncedLyrics: "[00:01.00] a" } });
+		expect(await fetchLyrics(q, doFetch)).toBe("[00:01.00] a");
+		expect(urls).toHaveLength(2);
+	});
+
+	it("falls back to search and keeps only the same song, synced first", async () => {
+		const { doFetch } = lrclib({
+			search: [
+				{
+					trackName: "Teardrop (Live)",
+					artistName: "Massive Attack",
+					duration: 330,
+					syncedLyrics: "live",
+				},
+				{
+					trackName: "Teardrop",
+					artistName: "Massive Attack",
+					duration: 345,
+					syncedLyrics: "long edit",
+				},
+				{
+					trackName: "Teardrop",
+					artistName: "Massive Attack",
+					duration: 331,
+					plainLyrics: "plain",
+				},
+				{
+					trackName: "Teardrop - Remastered",
+					artistName: "Massive Attack, Elizabeth Fraser",
+					duration: 329,
+					syncedLyrics: "[00:02.00] b",
+				},
+			],
+		});
+		expect(await fetchLyrics(q, doFetch)).toBe("[00:02.00] b");
+	});
+
+	it("returns null when nothing matches", async () => {
+		const { doFetch } = lrclib({
+			search: [
+				{
+					trackName: "Angel",
+					artistName: "Massive Attack",
+					duration: 330,
+					syncedLyrics: "x",
+				},
+			],
+		});
+		expect(await fetchLyrics(q, doFetch)).toBeNull();
+	});
+
+	it("matches title and artist after normalizing, within 2s", () => {
+		expect(
+			sameSong(q, {
+				trackName: "TEARDROP",
+				artistName: "massive attack",
+				duration: 332,
+			}),
+		).toBe(true);
+		expect(
+			sameSong(q, {
+				trackName: "Teardrop",
+				artistName: "Massive Attack",
+				duration: 333,
+			}),
+		).toBe(false);
+		expect(
+			sameSong(q, {
+				trackName: "Teardrop",
+				artistName: "Portishead",
+				duration: 330,
+			}),
+		).toBe(false);
+	});
+
+	it("compares the lead artist exactly, not as a substring", () => {
+		const nat = {
+			artist: "The National",
+			title: "Bloodbuzz Ohio",
+			album: null,
+			durationMs: 276_000,
+		};
+		expect(
+			sameSong(nat, {
+				trackName: "Bloodbuzz Ohio",
+				artistName: "The National Parks",
+				duration: 276,
+			}),
+		).toBe(false);
+		expect(
+			sameSong(nat, {
+				trackName: "Bloodbuzz Ohio",
+				artistName: "The National feat. Sufjan Stevens",
+				duration: 276,
+			}),
+		).toBe(true);
+		expect(firstArtist("Simon & Garfunkel")).toBe("Simon");
+		expect(firstArtist("Massive Attack, Elizabeth Fraser")).toBe(
+			"Massive Attack",
+		);
+	});
+
+	it("skips matched hits without lyrics and paces every request", async () => {
+		const { doFetch, urls } = lrclib({
+			search: [
+				{ trackName: "Teardrop", artistName: "Massive Attack", duration: 330 },
+				{
+					trackName: "Teardrop",
+					artistName: "Massive Attack",
+					duration: 330,
+					plainLyrics: "plain",
+				},
+			],
+		});
+		let paced = 0;
+		expect(
+			await fetchLyrics(q, doFetch, async () => {
+				paced++;
+			}),
+		).toBe("plain");
+		expect(paced).toBe(urls.length);
+		expect(paced).toBe(3);
 	});
 });

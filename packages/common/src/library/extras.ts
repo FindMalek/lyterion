@@ -2,6 +2,8 @@ import { execFile } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
+import { normalizeArtist, parseTitle } from "../identity/normalize";
+
 const run = promisify(execFile);
 
 // ReplayGain 2.0 reference loudness; same numbers rsgain writes for the beets side (D-020).
@@ -86,32 +88,92 @@ export type LrclibQuery = {
 	durationMs: number;
 };
 
-/** LRCLIB synced lyrics, else plain; null for instrumentals and misses. */
+type LrclibRecord = {
+	trackName?: string;
+	artistName?: string;
+	duration?: number;
+	instrumental?: boolean;
+	syncedLyrics?: string | null;
+	plainLyrics?: string | null;
+};
+
+const LRCLIB = "https://lrclib.net/api";
+const LRCLIB_HEADERS = {
+	"User-Agent": "Lyterion (https://github.com/FindMalek/lyterion)",
+};
+// LRCLIB's own /get tolerance; a wider gap is usually a different edit with different timings.
+const DURATION_TOLERANCE_S = 2;
+
+function lyricsOf(record: LrclibRecord): string | null {
+	if (record.instrumental) return null;
+	return record.syncedLyrics?.trim() || record.plainLyrics?.trim() || null;
+}
+
+// LRCLIB joins performers into one string ("A, B", "A feat. B", "A & B"); the lead is the part before the first separator.
+export function firstArtist(name: string): string {
+	return (
+		name.split(
+			/\s*(?:,|;|&|\/|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b|\bx\b)\s*/i,
+		)[0] ?? ""
+	);
+}
+
+/** True when a search hit is the same song: same title, version (live, remix…) and first artist after normalizing, length within 2s. */
+export function sameSong(query: LrclibQuery, record: LrclibRecord): boolean {
+	if (record.duration == null) return false;
+	if (
+		Math.abs(record.duration - query.durationMs / 1000) > DURATION_TOLERANCE_S
+	)
+		return false;
+	const title = parseTitle(query.title);
+	const found = parseTitle(record.trackName ?? "");
+	if (!title.base || title.base !== found.base) return false;
+	if ([...title.flags].sort().join() !== [...found.flags].sort().join())
+		return false;
+	return (
+		normalizeArtist(firstArtist(record.artistName ?? "")) ===
+		normalizeArtist(firstArtist(query.artist))
+	);
+}
+
+/** LRCLIB synced lyrics, else plain: exact match, then without the album (Spotify's rarely matches), then a search filtered by sameSong. */
 export async function fetchLyrics(
 	query: LrclibQuery,
 	doFetch: typeof fetch = fetch,
+	pace?: () => Promise<void>,
 ): Promise<string | null> {
-	const params = new URLSearchParams({
+	async function call(url: string): Promise<unknown | null> {
+		await pace?.();
+		const res = await doFetch(url, {
+			headers: LRCLIB_HEADERS,
+			signal: AbortSignal.timeout(10_000),
+		});
+		if (res.status === 404) return null;
+		if (!res.ok) throw new Error(`lrclib ${res.status}`);
+		return res.json();
+	}
+	const base = {
 		artist_name: query.artist,
 		track_name: query.title,
 		duration: String(Math.round(query.durationMs / 1000)),
-	});
-	if (query.album) params.set("album_name", query.album);
-	const res = await doFetch(`https://lrclib.net/api/get?${params}`, {
-		headers: {
-			"User-Agent": "Lyterion (https://github.com/FindMalek/lyterion)",
-		},
-		signal: AbortSignal.timeout(10_000),
-	});
-	if (res.status === 404) return null;
-	if (!res.ok) throw new Error(`lrclib ${res.status}`);
-	const body = (await res.json()) as {
-		instrumental?: boolean;
-		syncedLyrics?: string | null;
-		plainLyrics?: string | null;
 	};
-	if (body.instrumental) return null;
-	return body.syncedLyrics?.trim() || body.plainLyrics?.trim() || null;
+	const attempts = query.album
+		? [{ ...base, album_name: query.album }, base]
+		: [base];
+	for (const params of attempts) {
+		const record = (await call(
+			`${LRCLIB}/get?${new URLSearchParams(params)}`,
+		)) as LrclibRecord | null;
+		if (record) return lyricsOf(record);
+	}
+	const hits = (await call(
+		`${LRCLIB}/search?${new URLSearchParams({ track_name: query.title, artist_name: query.artist })}`,
+	)) as LrclibRecord[] | null;
+	const matches = (hits ?? []).filter((h) => sameSong(query, h));
+	const best =
+		matches.find((h) => !h.instrumental && h.syncedLyrics?.trim()) ??
+		matches.find((h) => !h.instrumental && h.plainLyrics?.trim());
+	return best ? lyricsOf(best) : null;
 }
 
 export function lrcPath(audioPath: string): string {
