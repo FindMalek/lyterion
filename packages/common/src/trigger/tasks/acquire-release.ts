@@ -2,11 +2,12 @@ import { logger, task } from "@trigger.dev/sdk";
 
 import { loadAcquireJob } from "../../acquire/persist";
 import { withAlbumResults } from "../../acquire/plan";
+import { runIsLive } from "../../acquire/queue";
 import { configuredProviders } from "../../credentials/providers";
 import type { Candidate, Provider } from "../../providers/types";
 import {
 	type AcquirePayload,
-	acquireOne,
+	acquireOneSafely,
 	acquireQueue,
 } from "./acquire-recording";
 
@@ -34,6 +35,7 @@ export const acquireReleaseTask = task({
 	queue: acquireQueue,
 	maxDuration: 3 * 3600,
 	run: async (payload: AcquireReleasePayload) => {
+		if (!(await runIsLive(payload.runId))) return { status: "stale" };
 		const providers = await configuredProviders();
 		const jobs = (
 			await Promise.all(payload.recordingIds.map((id) => loadAcquireJob(id)))
@@ -57,9 +59,17 @@ export const acquireReleaseTask = task({
 		const results: Record<string, string> = {};
 		for (const id of payload.recordingIds) {
 			const one: AcquirePayload = { runId: payload.runId, recordingId: id };
-			results[id] = (
-				await acquireOne(one, withAlbumResults(providers, slskd, found.get(id)))
-			).status;
+			try {
+				results[id] = (
+					await acquireOneSafely(
+						one,
+						withAlbumResults(providers, slskd, found.get(id)),
+					)
+				).status;
+			} catch (err) {
+				// Already counted as failed; the album's other tracks still go.
+				results[id] = `error: ${String(err)}`;
+			}
 		}
 		logger.info("release acquired", {
 			releaseId: payload.releaseId,

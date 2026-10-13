@@ -15,3 +15,13 @@ export async function updateStageProgress(
 		})
 		.where(eq(migrationRun.id, runId));
 }
+
+/** The stage's error as the dashboard shows it: one line, short enough for a table cell's tooltip. */
+export function errorText(err: unknown): string {
+	const text = err instanceof Error ? err.message : String(err);
+	const cause =
+		err instanceof Error && err.cause instanceof Error ? err.cause.message : "";
+	return (cause ? `${cause} (${text})` : text)
+		.replace(/\s+/g, " ")
+		.slice(0, 500);
+}

@@ -513,3 +513,17 @@ placement. `services.compose.yml` is this variant. Setting the repo secret
 D-030) instead, so adding a VPN later is one secret and one Infra run.
 YouTube Music (transparent per D-017) carries the steady daily sync, so
 slskd is for bulk catch-ups and lossless upgrades.
+
+## D-046 Acquire runs through a small refilled window, not a mass fan-out (2026-10-13)
+
+Run 2 queued 6,528 acquire tasks in batches of 500. Trigger.dev's batch
+rate limit (a 1,200-item bucket refilled at 10 per 10s on self-hosted
+defaults) refused the rest, and the run was marked failed while the 1,200
+it did queue kept running. Now identity.resolve marks the backlog
+`waiting` and dispatches a window of 20; each finished track claims the
+next ones. Nothing is ever near a rate limit, the Trigger.dev queue stays
+small, and stopping or restarting a run is instant: tasks of a run that is
+no longer `running` exit without work. `start run` defaults to the
+incremental export, which falls back to a full one until a full export
+has finished, so a re-run reads only what changed on Spotify. Stage
+errors are stored on the run and shown in the dashboard.

@@ -1,7 +1,7 @@
 import { logger, task } from "@trigger.dev/sdk";
 
 import { claimStage, finishRun } from "../../pipeline/advance";
-import { updateStageProgress } from "../../pipeline/progress";
+import { errorText, updateStageProgress } from "../../pipeline/progress";
 import { exportLibrary } from "../../spotify/export";
 import { ownerSpotifyAccount, ownerSpotifyClient } from "../../spotify/owner";
 import { persistExport, saveExportPage } from "../../spotify/persist";
@@ -76,6 +76,7 @@ export const spotifyExportTask = task({
 			await updateStageProgress(runId, STAGE, {
 				status: "failed",
 				finishedAt: new Date().toISOString(),
+				error: errorText(err),
 			});
 			await finishRun(runId, "failed");
 			throw err;

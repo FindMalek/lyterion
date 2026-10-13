@@ -125,6 +125,16 @@ export function RunsTable() {
 											)}
 										</span>
 									))}
+									{orderedStages(run.stages)
+										.filter(([, p]) => p.error)
+										.map(([stage, p]) => (
+											<p
+												key={`${stage}-error`}
+												className="mt-1 whitespace-normal break-words text-destructive"
+											>
+												{stage}: {p.error}
+											</p>
+										))}
 								</TableCell>
 								<TableCell className="px-3 py-1.5 font-mono">
 									{formatDateTime(run.startedAt)}
