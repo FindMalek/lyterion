@@ -540,3 +540,13 @@ run's own tasks are never caught, because the filter stops at the click.
 The daily `spotify.sync` cron still skips while a run is going, so it never
 stops a long first run.
 
+## D-048 YouTube Music is always on, through a PO-token server instead of cookies (2026-10-13)
+
+YouTube was gated on `LYTERION_YTDLP_COOKIES_PATH`, which was never set, so
+the source D-045 counts on for the daily sync never ran. Cookies tie
+downloads to a Google account that can get flagged, and they expire. The
+`bgutil-pot` container (`brainicism/bgutil-ytdlp-pot-provider`) in the
+services stack mints the PO tokens yt-dlp needs, and the task image carries
+its yt-dlp plugin, same version. `LYTERION_YTDLP_POT_PROVIDER_URL` defaults to
+`http://bgutil-pot:4416` on `dokploy-network`. Cookies stay an optional extra
+for when YouTube tightens again.

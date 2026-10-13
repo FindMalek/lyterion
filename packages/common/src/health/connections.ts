@@ -34,7 +34,7 @@ export type ConnectionsEnv = {
 	proxyBackends: string[];
 	lidarr?: { url: string; apiKey: string };
 	deezerArl?: string;
-	ytdlpCookiesPath?: string;
+	ytdlpPotUrl?: string;
 	acoustidKey?: string;
 	groqKey?: string;
 	jevKey?: string;
@@ -232,7 +232,21 @@ export async function checkConnections(
 				: null,
 		],
 		["deezer", "Deezer ARL", !!env.deezerArl, null],
-		["youtube", "YouTube Music", !!env.ytdlpCookiesPath, null],
+		[
+			"youtube",
+			"YouTube Music",
+			!!env.ytdlpPotUrl,
+			env.ytdlpPotUrl
+				? async () => {
+						// The PO-token server is what gets yt-dlp past YouTube's bot checks (D-048).
+						const res = await get(`${env.ytdlpPotUrl}/ping`);
+						return {
+							ok: res.ok,
+							detail: res.ok ? undefined : `PO-token server HTTP ${res.status}`,
+						};
+					}
+				: null,
+		],
 		["acoustid", "AcoustID", !!env.acoustidKey, null],
 		[
 			"groq",

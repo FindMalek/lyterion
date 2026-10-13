@@ -29,15 +29,14 @@ export async function configuredProviders(): Promise<Provider[]> {
 				pace: pacer("slskd-search", MIN_SEARCH_GAP_MS),
 			}),
 		);
-	// Opt-in through the cookies file: without cookies YouTube's bot checks fail most downloads.
-	if (env.LYTERION_YTDLP_COOKIES_PATH)
-		providers.push(
-			createYoutubeProvider({
-				cookiesPath: env.LYTERION_YTDLP_COOKIES_PATH,
-				potProviderUrl: env.LYTERION_YTDLP_POT_PROVIDER_URL,
-				binary: env.LYTERION_YTDLP_PATH,
-				pace: pacer("youtube", YOUTUBE_GAP_MS, YOUTUBE_JITTER_MS),
-			}),
-		);
+	// Always on: the bgutil PO-token server passes YouTube's bot checks without cookies; cookies are an optional extra.
+	providers.push(
+		createYoutubeProvider({
+			cookiesPath: env.LYTERION_YTDLP_COOKIES_PATH,
+			potProviderUrl: env.LYTERION_YTDLP_POT_PROVIDER_URL,
+			binary: env.LYTERION_YTDLP_PATH,
+			pace: pacer("youtube", YOUTUBE_GAP_MS, YOUTUBE_JITTER_MS),
+		}),
+	);
 	return providers;
 }
