@@ -565,7 +565,7 @@ function triggerInfra() {
 	});
 }
 
-// slskd behind gluetun, and ntfy (#7). Only the Proton key is required; the rest is generated once and kept.
+// slskd and ntfy (#7). With a Proton key, slskd goes behind gluetun (D-030); without, on the home connection (D-045).
 async function servicesInfra() {
 	const { readFile } = await import("node:fs/promises");
 	const script = await readFile(
@@ -574,9 +574,11 @@ async function servicesInfra() {
 	const suffix = randomBytes(3).toString("hex");
 	return deployCompose({
 		name: "lyterion-services",
-		file: "services.compose.yml",
+		file: process.env.PROTON_WIREGUARD_PRIVATE_KEY
+			? "services-vpn.compose.yml"
+			: "services.compose.yml",
 		env: (current) => ({
-			PROTON_WIREGUARD_PRIVATE_KEY: requireEnv("PROTON_WIREGUARD_PRIVATE_KEY"),
+			PROTON_WIREGUARD_PRIVATE_KEY: process.env.PROTON_WIREGUARD_PRIVATE_KEY,
 			PROTON_SERVER_COUNTRIES:
 				process.env.PROTON_SERVER_COUNTRIES || current.PROTON_SERVER_COUNTRIES,
 			SLSK_USERNAME:

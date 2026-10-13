@@ -499,3 +499,17 @@ expires when the job ends, and every later pull on the-keep, public images
 included, fails with `denied` (seen deploying the Trigger.dev stack, #4).
 Deploys and previews now pass `secrets.GHCR_READ_TOKEN` (classic PAT,
 `read:packages`), falling back to the job token only when it isn't set.
+
+## D-045 slskd runs without a VPN for now (2026-10-13, amends D-030, D-033)
+
+Proton's free plan has no P2P and no port forwarding, and a paid VPN isn't
+in the budget yet. Copyright notices aren't a concern in Tunisia, so the
+only risk left is attack surface, and that stays small: slskd publishes no
+port and gets no router forward (it only dials out, so downloads still work
+from peers with open ports), runs as uid 1000 in its own container, sees the
+library read only, and every download passes verification (D-007) before
+placement. `services.compose.yml` is this variant. Setting the repo secret
+`PROTON_WIREGUARD_PRIVATE_KEY` deploys `services-vpn.compose.yml` (gluetun,
+D-030) instead, so adding a VPN later is one secret and one Infra run.
+YouTube Music (transparent per D-017) carries the steady daily sync, so
+slskd is for bulk catch-ups and lossless upgrades.

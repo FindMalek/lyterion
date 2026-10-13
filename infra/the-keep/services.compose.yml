@@ -1,33 +1,8 @@
-# Dokploy compose "lyterion-services" on the-keep (#7): slskd behind gluetun (D-030, D-033) and ntfy (D-034).
-# api, dashboard and their Postgres are Dokploy apps (D-036, D-037). Env comes from the Dokploy compose env, never committed.
+# Dokploy compose "lyterion-services" on the-keep (#7): slskd straight on the home connection (D-045) and ntfy (D-034).
+# services-vpn.compose.yml is the same stack behind gluetun. Env comes from the Dokploy compose env, never committed.
 
 services:
-  gluetun:
-    image: qmcgaw/gluetun:v3.40.0
-    restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    environment:
-      VPN_SERVICE_PROVIDER: protonvpn
-      VPN_TYPE: wireguard
-      WIREGUARD_PRIVATE_KEY: ${PROTON_WIREGUARD_PRIVATE_KEY}
-      SERVER_COUNTRIES: ${PROTON_SERVER_COUNTRIES:-Netherlands}
-      PORT_FORWARD_ONLY: "on"
-      VPN_PORT_FORWARDING: "on"
-      VPN_PORT_FORWARDING_STATUS_FILE: /gluetun/forwarded_port
-      # slskd's web UI and API, reachable from dokploy-network only; never routed through Traefik.
-      FIREWALL_INPUT_PORTS: "5030"
-      TZ: ${TZ:-Europe/Paris}
-    volumes:
-      - gluetun:/gluetun
-    networks:
-      dokploy-network:
-        aliases:
-          - slskd
-
-  # Writes slskd.yml and rewrites it when Proton rotates the forwarded port; slskd reloads the file on change.
+  # Writes slskd.yml from env; slskd reloads the file on change.
   slskd-config:
     image: alpine:3.20
     restart: unless-stopped
@@ -40,21 +15,20 @@ services:
       # slskd-config.sh, base64, set by the deploy: a raw Dokploy compose has no repo files next to it.
       SLSKD_CONFIG_SCRIPT: ${SLSKD_CONFIG_SCRIPT}
     volumes:
-      - gluetun:/gluetun:ro
       - slskd-app:/app
+      - /srv/lyterion/slskd-downloads:/downloads
     command: ["/bin/sh", "-c", "echo \"$$SLSKD_CONFIG_SCRIPT\" | base64 -d > /tmp/slskd-config.sh && exec /bin/sh /tmp/slskd-config.sh"]
     healthcheck:
       test: ["CMD", "test", "-s", "/app/slskd.yml"]
       interval: 5s
       retries: 30
 
+  # No published ports and no router forward: slskd only dials out, so nothing new is reachable from the internet.
   slskd:
     image: slskd/slskd:0.21.4
     restart: unless-stopped
-    network_mode: service:gluetun
+    user: "1000:1000"
     depends_on:
-      gluetun:
-        condition: service_healthy
       slskd-config:
         condition: service_healthy
     environment:
@@ -65,6 +39,10 @@ services:
       # Shares the library read only (Soulseek expects sharing); downloads land where the Trigger worker reads them.
       - /srv/music:/music:ro
       - /srv/lyterion/slskd-downloads:/downloads
+    networks:
+      dokploy-network:
+        aliases:
+          - slskd
 
   ntfy:
     image: binwiederhier/ntfy:v2.11.0
@@ -91,7 +69,6 @@ services:
           - ntfy
 
 volumes:
-  gluetun:
   slskd-app:
   ntfy:
 

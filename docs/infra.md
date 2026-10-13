@@ -114,7 +114,10 @@ Done once. Items marked **Malek** need credentials only Malek has.
 ## Services compose (#7)
 
 `infra/the-keep/services.compose.yml`, deployed as the Dokploy compose
-`lyterion-services` by Actions → Infra → `stack: services`. The apps and
+`lyterion-services` by Actions → Infra → `stack: services`. Without a VPN
+(D-045) slskd sits straight on `dokploy-network` with no published port.
+With the repo secret `PROTON_WIREGUARD_PRIVATE_KEY` set, the deploy uses
+`services-vpn.compose.yml` instead, which adds gluetun as below. The apps and
 their Postgres stay Dokploy apps (above), so this only holds what they talk
 to:
 
@@ -129,7 +132,7 @@ Repo settings for the Infra run:
 
 | name | kind | value |
 |---|---|---|
-| `PROTON_WIREGUARD_PRIVATE_KEY` | secret, required | Proton → WireGuard config with NAT-PMP on, the `PrivateKey` line |
+| `PROTON_WIREGUARD_PRIVATE_KEY` | secret, optional (D-045) | Proton → WireGuard config with NAT-PMP on, the `PrivateKey` line |
 | `PROTON_SERVER_COUNTRIES` | var, optional | default `Netherlands` |
 | `SLSK_USERNAME` / `SLSK_PASSWORD` | var / secret, optional | the Soulseek account; generated once when unset (Soulseek registers a new name on first login) |
 | `NTFY_PUBLIC_HOST` | var, optional | default `ntfy.findmalek.engineer` |

@@ -1,0 +1,103 @@
+# Dokploy compose "lyterion-services" on the-keep (#7), VPN variant: slskd behind gluetun (D-030, D-033) and ntfy (D-034).
+# Deployed instead of services.compose.yml when PROTON_WIREGUARD_PRIVATE_KEY is set (D-045).
+# api, dashboard and their Postgres are Dokploy apps (D-036, D-037). Env comes from the Dokploy compose env, never committed.
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun:v3.40.0
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      VPN_SERVICE_PROVIDER: protonvpn
+      VPN_TYPE: wireguard
+      WIREGUARD_PRIVATE_KEY: ${PROTON_WIREGUARD_PRIVATE_KEY}
+      SERVER_COUNTRIES: ${PROTON_SERVER_COUNTRIES:-Netherlands}
+      PORT_FORWARD_ONLY: "on"
+      VPN_PORT_FORWARDING: "on"
+      VPN_PORT_FORWARDING_STATUS_FILE: /gluetun/forwarded_port
+      # slskd's web UI and API, reachable from dokploy-network only; never routed through Traefik.
+      FIREWALL_INPUT_PORTS: "5030"
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - gluetun:/gluetun
+    networks:
+      dokploy-network:
+        aliases:
+          - slskd
+
+  # Writes slskd.yml and rewrites it when Proton rotates the forwarded port; slskd reloads the file on change.
+  slskd-config:
+    image: alpine:3.20
+    restart: unless-stopped
+    environment:
+      SLSK_USERNAME: ${SLSK_USERNAME}
+      SLSK_PASSWORD: ${SLSK_PASSWORD}
+      SLSKD_WEB_USERNAME: ${SLSKD_WEB_USERNAME:-findmalek}
+      SLSKD_WEB_PASSWORD: ${SLSKD_WEB_PASSWORD}
+      SLSKD_API_KEY: ${SLSKD_API_KEY}
+      # slskd-config.sh, base64, set by the deploy: a raw Dokploy compose has no repo files next to it.
+      SLSKD_CONFIG_SCRIPT: ${SLSKD_CONFIG_SCRIPT}
+    volumes:
+      - gluetun:/gluetun:ro
+      - slskd-app:/app
+      - /srv/lyterion/slskd-downloads:/downloads
+    command: ["/bin/sh", "-c", "echo \"$$SLSKD_CONFIG_SCRIPT\" | base64 -d > /tmp/slskd-config.sh && exec /bin/sh /tmp/slskd-config.sh"]
+    healthcheck:
+      test: ["CMD", "test", "-s", "/app/slskd.yml"]
+      interval: 5s
+      retries: 30
+
+  slskd:
+    image: slskd/slskd:0.21.4
+    restart: unless-stopped
+    user: "1000:1000"
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+      slskd-config:
+        condition: service_healthy
+    environment:
+      SLSKD_REMOTE_CONFIGURATION: "false"
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - slskd-app:/app
+      # Shares the library read only (Soulseek expects sharing); downloads land where the Trigger worker reads them.
+      - /srv/music:/music:ro
+      - /srv/lyterion/slskd-downloads:/downloads
+
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    restart: unless-stopped
+    command: serve
+    environment:
+      NTFY_BASE_URL: ${NTFY_BASE_URL:-https://ntfy.findmalek.engineer}
+      NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
+      NTFY_AUTH_DEFAULT_ACCESS: deny-all
+      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+      NTFY_BEHIND_PROXY: "true"
+      NTFY_ENABLE_LOGIN: "true"
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - ntfy:/var/lib/ntfy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --tries=1 http://localhost:80/v1/health -O - | grep -q true"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    networks:
+      dokploy-network:
+        aliases:
+          - ntfy
+
+volumes:
+  gluetun:
+  slskd-app:
+  ntfy:
+
+networks:
+  dokploy-network:
+    external: true

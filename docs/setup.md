@@ -11,10 +11,10 @@ how to tell it worked. The details behind each piece are in
 |---|---|---|
 | `the-keep` with Dokploy, Garage and Navidrome running | everything runs there (D-003) | |
 | Spotify Premium and a Spotify developer app | dev-mode API access needs Premium on the app owner (D-029) | |
-| **Proton VPN Plus** | slskd only talks to Soulseek through it (D-030, D-033) | about $4/month |
+| Proton VPN Plus, optional | hides the home IP from Soulseek peers (D-030); slskd runs without it by default (D-045) | about $4/month |
 | AcoustID application key, Groq API key | verification and fuzzy matching | free |
 
-**Proton must be a paid plan.** The free plan only offers `*-FREE#` servers,
+**If you add a VPN, Proton must be a paid plan.** The free plan only offers `*-FREE#` servers,
 which block P2P and have no port forwarding (NAT-PMP). slskd would either be
 blocked or unable to accept connections, so most downloads fail. Plus
 includes both.
@@ -94,22 +94,19 @@ Details: [infra.md → Trigger.dev](infra.md#triggerdev-4).
 
 Details: [infra.md → Services compose](infra.md#services-compose-7).
 
-1. **Proton WireGuard key.** account.proton.me → VPN → Downloads →
-   WireGuard configuration:
-   - name: `the-keep-slskd`
-   - platform: GNU/Linux
-   - options: **NAT-PMP (Port Forwarding) on**, VPN Accelerator on
-   - server: Standard server configs → any **P2P** server (two-arrow icon),
-     e.g. in the Netherlands. The exact server doesn't matter: only the
-     private key is used, and gluetun picks its own P2P server in
-     `PROTON_SERVER_COUNTRIES` (default Netherlands).
-   - Create, then copy the value after `PrivateKey =`.
-2. Secret `PROTON_WIREGUARD_PRIVATE_KEY` = that value.
+1. **No VPN (default, D-045):** nothing to set. slskd publishes no port;
+   don't forward one on the router either.
+2. **With a VPN, later:** make a Proton WireGuard config (account.proton.me
+   → VPN → Downloads → WireGuard configuration; platform GNU/Linux,
+   **NAT-PMP on**, any **P2P** server under Standard server configs), and put
+   the value after `PrivateKey =` in the secret `PROTON_WIREGUARD_PRIVATE_KEY`.
+   The next Infra run switches slskd behind gluetun.
 3. Actions → **Infra** → `stack: services`. The Soulseek login, slskd web
    password and slskd api key are generated on the first run and kept;
    read them in Dokploy → `lyterion-services` → Environment.
-4. Check the tunnel: `docker logs <…-slskd-config-1>` prints
-   `slskd listen port: <n>` with Proton's forwarded port (not `50300`).
+4. Check slskd: `docker logs <…-slskd-1> 2>&1 | grep -i "logged in"` shows
+   it logged into Soulseek. With the VPN, `docker logs <…-slskd-config-1>`
+   also prints Proton's forwarded port instead of `50300`.
 5. ntfy users and token:
    ```bash
    docker exec -it <…-ntfy-1> ntfy user add --role=admin findmalek
