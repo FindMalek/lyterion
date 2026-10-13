@@ -15,6 +15,7 @@ import type {
 	ProviderHealth,
 	RecordingTarget,
 } from "./types";
+import { GiveUpError } from "./types";
 
 // slskd REST (/api/v0), docs/providers.md § slskd. Soulseek penalizes search floods, so searches are paced.
 export const MIN_SEARCH_GAP_MS = 5_000;
@@ -337,7 +338,7 @@ export function createSlskdProvider(options: SlskdOptions): Provider & {
 						`/transfers/downloads/${user}/${encodeURIComponent(transferId)}?remove=true`,
 						{ method: "DELETE" },
 					).catch(() => undefined);
-				throw new Error(
+				throw new GiveUpError(
 					`slskd download ${gaveUp ?? "timed out"}: ${ref.filename}`,
 				);
 			}

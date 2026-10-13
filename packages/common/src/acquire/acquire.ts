@@ -7,6 +7,7 @@ import type {
 	ProviderId,
 	RecordingTarget,
 } from "../providers/types";
+import { GiveUpError } from "../providers/types";
 import type { VerifyResult } from "../verify/index";
 import { applyPick, type PickAsk, pickCandidate } from "./picker";
 
@@ -83,6 +84,7 @@ async function fetchWithRetries(
 			return { path: file.path };
 		} catch (error) {
 			lastError = message(error);
+			if (error instanceof GiveUpError) break;
 			if (tryNo < retries) await sleep(2_000 * 2 ** tryNo);
 		}
 	}
