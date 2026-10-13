@@ -8,6 +8,7 @@ import type {
 	Provider,
 	RecordingTarget,
 } from "../../providers/types";
+import { GiveUpError } from "../../providers/types";
 import type { VerifyResult } from "../../verify/index";
 import { acquireRecording, type VerifiedOk } from "../acquire";
 
@@ -135,6 +136,25 @@ describe("acquireRecording", () => {
 		expect((await acquireRecording(target, d)).status).toBe("placed");
 		expect(proxy.fetches).toEqual(["a", "a", "a"]);
 		expect(placed).toEqual(["a"]);
+	});
+
+	it("moves on at once when a provider gives up on a candidate", async () => {
+		const slskd = fakeProvider("slskd", "C", [
+			{ ref: "queued-forever", matchConfidence: 0.95 },
+			{ ref: "next", matchConfidence: 0.9 },
+		]);
+		const fetch = slskd.fetch;
+		slskd.fetch = async (candidate, dir) => {
+			if (candidate.ref === "queued-forever") {
+				slskd.fetches.push(candidate.ref);
+				throw new GiveUpError("slskd download still queued after 3 min");
+			}
+			return fetch(candidate, dir);
+		};
+		const { deps: d, placed } = await deps([slskd], () => ok);
+		expect((await acquireRecording(target, d)).status).toBe("placed");
+		expect(slskd.fetches).toEqual(["queued-forever", "next"]);
+		expect(placed).toEqual(["next"]);
 	});
 
 	it("sends near misses to review and empty searches to missing", async () => {
