@@ -562,6 +562,20 @@ The browser's `<audio controls>` is replaced by a player built from the kit's
 Button and Slider (D-015), with space to play/pause. The nav shows open
 review items as an amber count until the queue is empty.
 
+## D-050 Lyrics: a looser LRCLIB lookup, embedded in the file as well as the `.lrc` (2026-10-13)
+
+Lyrics were fetched with LRCLIB's exact `/get` (artist, title, album,
+duration), and Spotify's album names ("… (Deluxe Edition)", "… - Remastered")
+rarely match LRCLIB's, so most lookups missed silently. Now: exact `/get`,
+then `/get` without the album, then `/search` keeping only a hit with the
+same normalized title, version flags (live, remix…) and first artist, within
+2s, synced lyrics first. The result is embedded in the tags (Vorbis
+`LYRICS`, ID3 `USLT`, MP4 `©lyr`) and still written as the `.lrc` sidecar
+(D-020), so Navidrome serves them to Arpeggi and keep-player and a
+downloaded file carries them too. `lyrics.backfill` (Library → fetch
+lyrics) embeds existing sidecars and looks up the rest, one LRCLIB call a
+second.
+
 ## D-052 Acquire runs 8 at a time, and a stuck Soulseek download gives up (2026-10-13, #118)
 
 Run 4 placed about 10 tracks in 32 minutes. The `acquire` queue allowed 2

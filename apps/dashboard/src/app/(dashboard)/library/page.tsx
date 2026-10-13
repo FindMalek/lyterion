@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { DuplicatesTable } from "@/components/app/duplicates-table";
 import { LibraryTable } from "@/components/app/library-table";
+import { LyricsBackfillButton } from "@/components/app/lyrics-backfill-button";
 import { ReconcilePlan } from "@/components/app/reconcile-plan";
 import { PageHeader } from "@/components/shared/page-header";
 
@@ -21,7 +22,8 @@ export default async function LibraryPage({
 				title="Library"
 				description="every recording and the file that holds it"
 				actions={
-					<div className="flex gap-3 font-mono text-xs">
+					<div className="flex items-center gap-3 font-mono text-xs">
+						<LyricsBackfillButton />
 						<Link href="/library" className={tab(!duplicates && !reconcile)}>
 							tracks
 						</Link>
