@@ -21,6 +21,9 @@ const TOOLS: [string, string[]][] = [
 		["-c", "import mutagen; print('mutagen', mutagen.version_string)"],
 	],
 	["yt-dlp", ["--version"]],
+	["rsgain", ["--version"]],
+	["rip", ["--version"]],
+	["aria2c", ["--version"]],
 ];
 
 // #5: the folders bound into runs by the patched supervisor must be writable, or acquire fails late.
