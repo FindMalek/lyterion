@@ -490,3 +490,12 @@ silently drop the mounts. On each Trigger.dev upgrade, bump the version in
 the compose, the supervisor workflow and `scripts/deploy-trigger.mjs`
 together. The pipeline code is unchanged: tasks keep using local paths
 (`/music`, `/staging`, `/slskd/downloads`).
+
+## D-044 Dokploy pulls from GHCR with the long-lived read token (2026-10-12, amends D-037)
+
+Each app deploy registers the GHCR credentials with Dokploy, which logs the
+host's Docker into `ghcr.io`. With the job's `GITHUB_TOKEN` that login
+expires when the job ends, and every later pull on the-keep, public images
+included, fails with `denied` (seen deploying the Trigger.dev stack, #4).
+Deploys and previews now pass `secrets.GHCR_READ_TOKEN` (classic PAT,
+`read:packages`), falling back to the job token only when it isn't set.
