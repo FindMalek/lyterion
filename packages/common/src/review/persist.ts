@@ -7,7 +7,7 @@ import {
 	release,
 	reviewItem,
 } from "@lyterion/db/schema/library";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 
 import type { SlskdRef } from "../providers/slskd";
 
@@ -23,6 +23,15 @@ export function candidateLabel(providerId: string, ref: string): string {
 	} catch {
 		return ref;
 	}
+}
+
+/** Open review items, for the nav badge. */
+export async function openReviewCount(): Promise<number> {
+	const [row] = await db
+		.select({ n: count() })
+		.from(reviewItem)
+		.where(isNull(reviewItem.resolvedAt));
+	return row?.n ?? 0;
 }
 
 export async function openReviews() {

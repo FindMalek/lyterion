@@ -1,5 +1,6 @@
 import { StartRunError, triggerTask } from "@lyterion/common/pipeline/start";
 import {
+	openReviewCount,
 	openReviews,
 	reviewForRecording,
 	skipRecording,
@@ -12,6 +13,7 @@ import { protectedProcedure } from "../procedures";
 
 export const reviewRouter = {
 	list: protectedProcedure.handler(() => openReviews()),
+	count: protectedProcedure.handler(() => openReviewCount()),
 	pick: protectedProcedure
 		.input(
 			z.object({ reviewId: z.number().int(), candidateId: z.number().int() }),
