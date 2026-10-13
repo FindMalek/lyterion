@@ -114,46 +114,43 @@ Done once. Items marked **Malek** need credentials only Malek has.
 ## Services compose (#7)
 
 `infra/the-keep/services.compose.yml`, deployed as the Dokploy compose
-`lyterion-services` from this repo. The apps and their Postgres stay Dokploy
-apps (above), so this only holds what they talk to:
+`lyterion-services` by Actions → Infra → `stack: services`. The apps and
+their Postgres stay Dokploy apps (above), so this only holds what they talk
+to:
 
 | service | reach | notes |
 |---|---|---|
 | `gluetun` | none from outside | Proton WireGuard, port forwarding on (D-030, D-033). Kill switch: slskd has no network when the tunnel is down |
-| `slskd-config` | none | renders `slskd.yml` and rewrites `listen_port` when Proton rotates the forwarded port; slskd reloads the file |
+| `slskd-config` | none | renders `slskd.yml` and rewrites `listen_port` when Proton rotates the forwarded port; slskd reloads the file. The deploy passes `slskd-config.sh` in as base64, since a raw Dokploy compose has no repo files beside it |
 | `slskd` | `http://slskd:5030` on `dokploy-network` | shares `/srv/music` read only, downloads to `/srv/lyterion/slskd-downloads`. LAN only, no Traefik route |
-| `ntfy` | `http://ntfy` on `dokploy-network`, public through the tunnel | access control on, deny-all by default (D-034) |
+| `ntfy` | `http://ntfy` on `dokploy-network`, public at `ntfy.findmalek.engineer` | access control on, deny-all by default (D-034) |
 
-Compose env in Dokploy:
+Repo settings for the Infra run:
 
-| var | value |
-|---|---|
-| `PROTON_WIREGUARD_PRIVATE_KEY` | Proton → WireGuard config with NAT-PMP on, the `PrivateKey` line |
-| `PROTON_SERVER_COUNTRIES` | optional, default `Netherlands` |
-| `SLSK_USERNAME` / `SLSK_PASSWORD` | the Soulseek account |
-| `SLSKD_WEB_PASSWORD` | slskd web UI login (`findmalek`) |
-| `SLSKD_API_KEY` | random, at least 16 characters |
-| `NTFY_BASE_URL` | optional, default `https://ntfy.findmalek.engineer` |
+| name | kind | value |
+|---|---|---|
+| `PROTON_WIREGUARD_PRIVATE_KEY` | secret, required | Proton → WireGuard config with NAT-PMP on, the `PrivateKey` line |
+| `PROTON_SERVER_COUNTRIES` | var, optional | default `Netherlands` |
+| `SLSK_USERNAME` / `SLSK_PASSWORD` | var / secret, optional | the Soulseek account; generated once when unset (Soulseek registers a new name on first login) |
+| `NTFY_PUBLIC_HOST` | var, optional | default `ntfy.findmalek.engineer` |
+
+`SLSKD_API_KEY` and `SLSKD_WEB_PASSWORD` are generated on the first deploy and
+kept in the compose env, so redeploys never rotate them. Read them in Dokploy
+→ `lyterion-services` → Environment.
 
 After the first deploy:
 
-1. In Dokploy, add the domain `ntfy.findmalek.engineer` → service `ntfy`,
-   port 80, and route it through the Cloudflare tunnel so the phone gets
-   pushes away from home.
-2. Create the users and the token, then subscribe the phone as `findmalek`:
+1. Create the ntfy users and token, then subscribe the phone as `findmalek`:
    ```bash
    docker exec -it <ntfy container> ntfy user add --role=admin findmalek
    docker exec -it <ntfy container> ntfy user add lyterion
    docker exec -it <ntfy container> ntfy access lyterion lyterion write-only
    docker exec -it <ntfy container> ntfy token add lyterion
    ```
-3. In the Lyterion dashboard → Connections:
+2. In the Lyterion dashboard → Connections:
    - slskd: url `http://slskd:5030`, api key `SLSKD_API_KEY`
-   - ntfy: url `http://ntfy`, topic `lyterion`, the token from step 2
-4. Mount `/srv/lyterion/slskd-downloads` into the Trigger.dev worker at
-   `LYTERION_SLSKD_DOWNLOADS_DIR` (default `/slskd/downloads`), next to
-   `/music` and `/staging` (#5).
-5. Check the tunnel: `docker logs <slskd-config>` prints the forwarded port,
+   - ntfy: url `http://ntfy`, topic `lyterion`, the token from step 1
+3. Check the tunnel: `docker logs <slskd-config>` prints the forwarded port,
    and slskd's web UI (through an SSH tunnel to port 5030) shows it as the
    listen port with the server connected.
 

@@ -11,6 +11,7 @@ on:
         options:
           - turbo-cache
           - trigger
+          - services
         default: turbo-cache
       remove_postgres_ids:
         description: "Postgres ids to delete instead of deploying (space separated)"
@@ -52,6 +53,18 @@ jobs:
           GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         run: node scripts/deploy/dokploy.mjs trigger-infra
+
+      - name: Deploy lyterion-services compose
+        if: inputs.remove_postgres_ids == '' && inputs.stack == 'services'
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_PUBLIC_URL || 'https://dokploy.findmalek.engineer' }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          PROTON_WIREGUARD_PRIVATE_KEY: ${{ secrets.PROTON_WIREGUARD_PRIVATE_KEY }}
+          PROTON_SERVER_COUNTRIES: ${{ vars.PROTON_SERVER_COUNTRIES }}
+          SLSK_USERNAME: ${{ vars.SLSK_USERNAME }}
+          SLSK_PASSWORD: ${{ secrets.SLSK_PASSWORD }}
+          NTFY_PUBLIC_HOST: ${{ vars.NTFY_PUBLIC_HOST }}
+        run: node scripts/deploy/dokploy.mjs services-infra
 
       - name: Remove orphaned Postgres services
         if: inputs.remove_postgres_ids != ''
