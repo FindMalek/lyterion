@@ -74,7 +74,7 @@ export function RunControls() {
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end" className="w-56">
 						<DropdownMenuItem
-							disabled={running}
+							disabled={running || start.isPending}
 							onSelect={() => setFinalOpen(true)}
 						>
 							<Icons.download />

@@ -178,6 +178,16 @@ export function RunsTable() {
 											</span>
 										))}
 									</span>
+									{orderedStages(run.stages)
+										.filter(([, p]) => p.error)
+										.map(([stage, p]) => (
+											<p
+												key={`${stage}-error`}
+												className="mt-1 whitespace-normal break-words text-destructive"
+											>
+												{stageLabel(stage)}: {p.error}
+											</p>
+										))}
 								</TableCell>
 								<TableCell className="hidden font-mono sm:table-cell">
 									{formatDateTime(run.startedAt)}
