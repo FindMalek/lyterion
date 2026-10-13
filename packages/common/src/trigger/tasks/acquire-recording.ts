@@ -3,6 +3,7 @@ import { logger, queue, task } from "@trigger.dev/sdk";
 
 import { acquireRecording } from "../../acquire/acquire";
 import { diskGuard } from "../../acquire/disk";
+import { dispatchAcquire } from "../../acquire/dispatch";
 import { groqPickAsk } from "../../acquire/llm";
 import {
 	createPlacer,
@@ -11,6 +12,7 @@ import {
 	recordOutcome,
 	setRecordingStatus,
 } from "../../acquire/persist";
+import { failIfInFlight, runIsLive } from "../../acquire/queue";
 import { configuredProviders } from "../../credentials/providers";
 import { getCredentials } from "../../credentials/store";
 import { albumGainAfterPlace } from "../../library/album-gain";
@@ -47,6 +49,7 @@ export async function acquireOne(
 	payload: AcquirePayload,
 	providersOverride?: Provider[],
 ) {
+	if (!(await runIsLive(payload.runId))) return { status: "stale" as const };
 	const job = await loadAcquireJob(payload.recordingId);
 	if (!job) return { status: "gone" as const };
 	const [providers, acoustid, groq] = await Promise.all([
@@ -104,22 +107,7 @@ export async function acquireOne(
 	}
 	if (outcome.status === "review")
 		await notifyReviewNeeded().catch(() => false);
-	const progress = await incrementStage(
-		payload.runId,
-		ACQUIRE_STAGE,
-		outcome.status === "placed" ? { done: 1 } : { failed: 1 },
-	);
-	if (stageComplete(progress) && (await claimStage(payload.runId, "finish"))) {
-		await finishRun(payload.runId, "done");
-		await navidromeScanTask.trigger({ force: true });
-		await lidarrRequestTask.trigger(undefined);
-		const summary = await runSummary();
-		await notifyOwner({
-			kind: "run_finished",
-			summary: summary.text,
-			failed: summary.failed,
-		}).catch(() => undefined);
-	}
+	await countAndContinue(payload.runId, outcome.status === "placed");
 	logger.info("acquire done", {
 		status: outcome.status,
 		tried: outcome.attempts.length,
@@ -130,10 +118,48 @@ export async function acquireOne(
 	return { status: outcome.status };
 }
 
+/** Counts the track, tops the window up, and closes the run when it was the last one (D-014). */
+async function countAndContinue(runId: number, placed: boolean) {
+	const progress = await incrementStage(
+		runId,
+		ACQUIRE_STAGE,
+		placed ? { done: 1 } : { failed: 1 },
+	);
+	await dispatchAcquire(runId);
+	if (stageComplete(progress) && (await claimStage(runId, "finish"))) {
+		await finishRun(runId, "done");
+		await navidromeScanTask.trigger({ force: true });
+		await lidarrRequestTask.trigger(undefined);
+		const summary = await runSummary();
+		await notifyOwner({
+			kind: "run_finished",
+			summary: summary.text,
+			failed: summary.failed,
+		}).catch(() => undefined);
+	}
+}
+
+/** A crash on one track counts as a failure for that track, so the run keeps its window full instead of stalling. */
+export async function acquireOneSafely(
+	payload: AcquirePayload,
+	providersOverride?: Provider[],
+) {
+	try {
+		return await acquireOne(payload, providersOverride);
+	} catch (err) {
+		if (
+			(await failIfInFlight(payload.recordingId)) &&
+			(await runIsLive(payload.runId))
+		)
+			await countAndContinue(payload.runId, false);
+		throw err;
+	}
+}
+
 // One recording per run (docs/pipeline.md): the last one to finish closes the migration run (D-014).
 export const acquireRecordingTask = task({
 	id: "acquire.recording",
 	queue: acquireQueue,
 	maxDuration: 3600,
-	run: (payload: AcquirePayload) => acquireOne(payload),
+	run: (payload: AcquirePayload) => acquireOneSafely(payload),
 });

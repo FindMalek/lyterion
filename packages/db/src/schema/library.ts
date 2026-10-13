@@ -15,6 +15,8 @@ import {
 export type RecordingStatus =
 	| "pending"
 	| "resolved"
+	| "waiting"
+	| "queued"
 	| "searching"
 	| "fetching"
 	| "verifying"

@@ -1,19 +1,15 @@
 import { env } from "@lyterion/env/server";
-import { idempotencyKeys, logger, task } from "@trigger.dev/sdk";
+import { logger, task } from "@trigger.dev/sdk";
 
-import { recordingsToAcquire } from "../../acquire/persist";
-import { planAcquire } from "../../acquire/plan";
+import { dispatchAcquire } from "../../acquire/dispatch";
+import { markWaiting, releaseStaleClaims } from "../../acquire/queue";
 import { getCredentials } from "../../credentials/store";
 import { runIdentityResolve } from "../../identity/persist";
 import { createNavidromeClient } from "../../navidrome/client";
 import { indexExistingLibrary } from "../../navidrome/index-persist";
 import { finishRun } from "../../pipeline/advance";
-import { updateStageProgress } from "../../pipeline/progress";
-import { chunk } from "../utils/chunk";
-import { ACQUIRE_STAGE, acquireRecordingTask } from "./acquire-recording";
-import { acquireReleaseTask } from "./acquire-release";
-
-const BATCH = 500;
+import { errorText, updateStageProgress } from "../../pipeline/progress";
+import { ACQUIRE_STAGE } from "./acquire-recording";
 
 const STAGE = "identity.resolve";
 
@@ -27,6 +23,9 @@ export const identityResolveTask = task({
 			startedAt: new Date().toISOString(),
 		});
 		try {
+			const stale = await releaseStaleClaims();
+			if (stale > 0)
+				logger.info("released claims left by a dead run", { stale });
 			const summary = await runIdentityResolve();
 			logger.info("identity resolved", summary);
 			await updateStageProgress(runId, STAGE, {
@@ -54,63 +53,25 @@ export const identityResolveTask = task({
 					});
 				}
 			}
-			const todo = await recordingsToAcquire();
+			const backlog = await markWaiting();
 			await updateStageProgress(runId, ACQUIRE_STAGE, {
-				status: todo.length > 0 ? "running" : "done",
-				total: todo.length,
+				status: backlog > 0 ? "running" : "done",
+				total: backlog,
 				done: 0,
 				failed: 0,
 				startedAt: new Date().toISOString(),
 			});
-			if (todo.length === 0) {
+			if (backlog === 0) {
 				await finishRun(runId, "done");
 				return { ...summary, acquire: 0 };
 			}
-			const plan = planAcquire(todo, !!(await getCredentials("slskd")));
-			for (const batch of chunk(plan.releases, BATCH)) {
-				await acquireReleaseTask.batchTrigger(
-					await Promise.all(
-						batch.map(async (r) => ({
-							payload: {
-								runId,
-								releaseId: r.releaseId,
-								recordingIds: r.recordings.map((x) => x.id),
-							},
-							options: {
-								idempotencyKey: await idempotencyKeys.create(
-									`release:${r.releaseId}:${runId}:${Math.max(...r.recordings.map((x) => x.generation))}`,
-									{ scope: "global" },
-								),
-							},
-						})),
-					),
-				);
-			}
-			// One attempt per recording per run; the generation lets the owner force a retry inside a run.
-			for (const batch of chunk(plan.singles, BATCH)) {
-				await acquireRecordingTask.batchTrigger(
-					await Promise.all(
-						batch.map(async (r) => ({
-							payload: { runId, recordingId: r.id },
-							options: {
-								idempotencyKey: await idempotencyKeys.create(
-									`recording:${r.id}:${runId}:${r.generation}`,
-									{ scope: "global" },
-								),
-							},
-						})),
-					),
-				);
-			}
-			return {
-				...summary,
-				acquire: todo.length,
-				albums: plan.releases.length,
-			};
+			const dispatched = await dispatchAcquire(runId);
+			return { ...summary, acquire: backlog, dispatched };
 		} catch (err) {
 			await updateStageProgress(runId, STAGE, {
 				status: "failed",
 				finishedAt: new Date().toISOString(),
+				error: errorText(err),
 			});
 			await finishRun(runId, "failed");
 			throw err;

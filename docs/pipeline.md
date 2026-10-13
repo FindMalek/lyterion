@@ -9,7 +9,7 @@ migration.start
                                   ▼
                           identity.resolve      MusicBrainz, grouping, placement
                                   ▼
-               acquire.release / acquire.recording   (fan-out, batches of 500)
+               acquire.release / acquire.recording   (window of 20, refilled per track, D-046)
                     providers → verify → library.place
                                   ▼
                           navidrome.scan        debounced, also fires mid-run
@@ -38,6 +38,18 @@ Manual:
   stage. A unique key on `(run, stage)` makes that trigger fire once.
 - No task waits on children for hours, so nothing depends on checkpointing
   (S4).
+- **Acquire window (D-046).** identity.resolve marks the backlog `waiting`
+  (everything `resolved` or `missing`; placed tracks are never redone) and
+  sets the acquire total. `dispatchAcquire` claims up to 20 `waiting`
+  tracks as `queued` (album by album, `FOR UPDATE SKIP LOCKED`, so racing
+  top-ups never overlap) and triggers them; every finished track tops the
+  window up again. A failed trigger puts its claims back. A crash in one
+  track counts it as failed once and the run goes on.
+- **Stale runs.** Acquire tasks whose run is no longer `running` exit
+  without work, and the next run frees anything a dead run left `waiting`
+  or in flight.
+- **Errors** land in the stage's `error` field and show under the run in
+  the dashboard.
 - The dashboard streams progress with Trigger realtime or polls the run row.
 
 ## Idempotency

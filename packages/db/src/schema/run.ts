@@ -16,6 +16,7 @@ export type StageProgress = {
 	failed: number;
 	startedAt?: string;
 	finishedAt?: string;
+	error?: string;
 };
 
 export const migrationRun = pgTable("migration_run", {

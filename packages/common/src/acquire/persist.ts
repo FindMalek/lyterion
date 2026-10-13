@@ -12,7 +12,7 @@ import {
 	reviewItem,
 } from "@lyterion/db/schema/library";
 import { spotifyTrack } from "@lyterion/db/schema/spotify";
-import { and, eq, inArray, max, sql } from "drizzle-orm";
+import { and, eq, max, sql } from "drizzle-orm";
 
 import {
 	fetchLyrics,
@@ -326,22 +326,6 @@ export type AcquireTodo = {
 	generation: number;
 	releaseId: string | null;
 };
-
-export async function recordingsToAcquire(): Promise<AcquireTodo[]> {
-	const rows = await db
-		.select({
-			id: recording.id,
-			generation: recording.generation,
-			placed: recording.placedReleaseIds,
-		})
-		.from(recording)
-		.where(inArray(recording.status, ["resolved", "missing"]));
-	return rows.map((r) => ({
-		id: r.id,
-		generation: r.generation,
-		releaseId: r.placed[0] ?? null,
-	}));
-}
 
 export function reviewDir(stagingDir: string, recordingId: string): string {
 	return path.join(stagingDir, "review", recordingId);

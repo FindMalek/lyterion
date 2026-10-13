@@ -32,13 +32,14 @@ export const runsRouter = {
 		.input(
 			z
 				.object({
-					mode: z.enum(["full", "incremental", "final"]).default("full"),
+					// Incremental by default: loadIncrementalState falls back to a full export until one has finished.
+					mode: z.enum(["full", "incremental", "final"]).default("incremental"),
 				})
 				.optional(),
 		)
 		.handler(async ({ input }) => {
 			try {
-				return await startMigrationRun(input?.mode ?? "full");
+				return await startMigrationRun(input?.mode ?? "incremental");
 			} catch (err) {
 				if (err instanceof StartRunError)
 					throw new ORPCError("PRECONDITION_FAILED", { message: err.message });
