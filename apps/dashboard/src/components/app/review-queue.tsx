@@ -3,7 +3,12 @@
 import type { AppRouterClient } from "@lyterion/orpc";
 import { Button, cn } from "@lyterion/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import {
+	AudioPlayer,
+	type AudioPlayerHandle,
+} from "@/components/shared/audio-player";
 
 import { env } from "@/lib/env";
 import { orpc } from "@/shared/api/orpc";
@@ -32,7 +37,10 @@ export function ReviewQueue() {
 	const selected = candidates[Math.min(candidateIndex, candidates.length - 1)];
 
 	const refresh = () =>
-		queryClient.invalidateQueries({ queryKey: orpc.review.list.key() });
+		Promise.all([
+			queryClient.invalidateQueries({ queryKey: orpc.review.list.key() }),
+			queryClient.invalidateQueries({ queryKey: orpc.review.count.key() }),
+		]);
 	const pick = useMutation({
 		...orpc.review.pick.mutationOptions(),
 		onSuccess: refresh,
@@ -42,16 +50,23 @@ export function ReviewQueue() {
 		onSuccess: refresh,
 	});
 	const busy = pick.isPending || skip.isPending;
+	const player = useRef<AudioPlayerHandle>(null);
 
 	useEffect(() => {
 		function onKey(e: KeyboardEvent) {
 			if (
 				e.target instanceof HTMLInputElement ||
+				e.target instanceof HTMLTextAreaElement ||
 				e.metaKey ||
 				e.ctrlKey ||
 				!item
 			)
 				return;
+			// Space and Enter belong to a focused button, link or slider; the shortcuts only fire from the page itself.
+			const onControl =
+				e.target instanceof Element &&
+				!!e.target.closest("button, a, [role=slider], [role=button]");
+			if ((e.key === " " || e.key === "Enter") && onControl) return;
 			if (e.key === "j")
 				setCandidateIndex((i) => Math.min(i + 1, candidates.length - 1));
 			else if (e.key === "k") setCandidateIndex((i) => Math.max(i - 1, 0));
@@ -64,6 +79,7 @@ export function ReviewQueue() {
 			} else if (e.key === "Enter" && selected && !busy)
 				pick.mutate({ reviewId: item.id, candidateId: selected.id });
 			else if (e.key === "s" && !busy) skip.mutate({ reviewId: item.id });
+			else if (e.key === " ") player.current?.toggle();
 			else return;
 			e.preventDefault();
 		}
@@ -182,14 +198,10 @@ export function ReviewQueue() {
 				</div>
 				<div className="flex flex-wrap items-center gap-3 px-3 py-2">
 					{selected?.previewable ? (
-						// biome-ignore lint/a11y/useMediaCaption: a music preview has no speech to caption
-						<audio
-							key={selected.id}
-							controls
-							preload="none"
-							crossOrigin="use-credentials"
+						<AudioPlayer
+							ref={player}
 							src={`${env.NEXT_PUBLIC_LYTERION_API_URL}/api/review/audio/${selected.id}`}
-							className="h-8 w-full max-w-md"
+							className="w-full max-w-md"
 						/>
 					) : (
 						<span className="font-mono text-muted-foreground text-xs">
@@ -217,7 +229,7 @@ export function ReviewQueue() {
 						skip track
 					</Button>
 					<span className="font-mono text-[11px] text-muted-foreground">
-						j/k candidate · enter pick · s skip · n/p track
+						space play · j/k candidate · enter pick · s skip · n/p track
 					</span>
 					{(pick.error ?? skip.error) && (
 						<span className="font-mono text-destructive text-xs">

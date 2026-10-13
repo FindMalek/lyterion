@@ -551,6 +551,17 @@ its yt-dlp plugin, same version. `LYTERION_YTDLP_POT_PROVIDER_URL` defaults to
 `http://bgutil-pot:4416` on `dokploy-network`. Cookies stay an optional extra
 for when YouTube tightens again.
 
+## D-049 Review previews: the api mounts staging, and the player is ours (2026-10-13)
+
+The review page's preview never played. The audio route streams the near miss
+from `/staging`, but only Trigger.dev runs had that folder mounted, so the api
+answered `410 gone` for every candidate. The production api app now gets a
+Dokploy bind mount `/srv/lyterion/staging` → `/staging`, added by the deploy
+script once and kept on redeploys. Previews have no staging, so they get none.
+The browser's `<audio controls>` is replaced by a player built from the kit's
+Button and Slider (D-015), with space to play/pause. The nav shows open
+review items as an amber count until the queue is empty.
+
 ## D-050 Lyrics: a looser LRCLIB lookup, embedded in the file as well as the `.lrc` (2026-10-13)
 
 Lyrics were fetched with LRCLIB's exact `/get` (artist, title, album,

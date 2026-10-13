@@ -1,10 +1,12 @@
 "use client";
 
 import { cn, LyterionBrandHeader } from "@lyterion/ui";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { authClient } from "@/shared/api/auth-client";
+import { orpc } from "@/shared/api/orpc";
 
 const NAV = [
 	{ href: "/", label: "overview" },
@@ -22,6 +24,12 @@ function isActive(pathname: string, href: string) {
 export function AppSidebar({ userName }: { userName: string }) {
 	const pathname = usePathname();
 	const router = useRouter();
+	const review = useQuery({
+		...orpc.review.count.queryOptions(),
+		refetchInterval: 30_000,
+		meta: { silent: true },
+	});
+	const toReview = review.data ?? 0;
 
 	async function signOut() {
 		await authClient.signOut();
@@ -46,11 +54,20 @@ export function AppSidebar({ userName }: { userName: string }) {
 						href={item.href}
 						aria-current={isActive(pathname, item.href) ? "page" : undefined}
 						className={cn(
-							"flex h-7 items-center px-2 text-muted-foreground text-xs hover:bg-muted hover:text-foreground",
+							"flex h-7 items-center gap-2 px-2 text-muted-foreground text-xs hover:bg-muted hover:text-foreground",
 							"aria-[current=page]:bg-muted aria-[current=page]:text-foreground",
 						)}
 					>
 						{item.label}
+						{item.href === "/review" && toReview > 0 && (
+							<span
+								role="status"
+								aria-label={`${toReview} to review`}
+								className="ml-auto bg-warning/15 px-1.5 font-mono text-[11px] text-warning tabular-nums"
+							>
+								{toReview}
+							</span>
+						)}
 					</Link>
 				))}
 			</div>
