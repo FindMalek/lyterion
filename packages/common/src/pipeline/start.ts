@@ -1,7 +1,7 @@
 import { db } from "@lyterion/db";
 import { migrationRun } from "@lyterion/db/schema/run";
 import { env } from "@lyterion/env/server";
-import { configure, tasks } from "@trigger.dev/sdk";
+import { configure, runs, tasks } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
 
 import type { ExportMode } from "../spotify/sync-state";
@@ -32,16 +32,59 @@ export async function triggerTask(id: string, payload: unknown): Promise<void> {
 	}
 }
 
+// Every task a migration run fans into; a new run cancels whatever of these an older run left alive.
+export const PIPELINE_TASKS = [
+	"spotify.export",
+	"identity.resolve",
+	"acquire.recording",
+	"acquire.release",
+];
+/** Marks older runs cancelled and bulk-cancels their tasks, old deploy versions included. Only jobs created before now. */
+export async function supersedeRuns(): Promise<number[]> {
+	const stopped = await db
+		.update(migrationRun)
+		.set({ status: "cancelled", finishedAt: new Date() })
+		.where(eq(migrationRun.status, "running"))
+		.returning({ id: migrationRun.id });
+	try {
+		await runs.bulk.cancel({
+			name: `superseded by a new run (was ${stopped.map((r) => r.id).join(", ") || "none running"})`,
+			filter: {
+				taskIdentifier: PIPELINE_TASKS,
+				status: [
+					"PENDING_VERSION",
+					"DELAYED",
+					"QUEUED",
+					"DEQUEUED",
+					"EXECUTING",
+					"WAITING",
+				],
+				to: new Date(),
+			},
+		});
+	} catch (err) {
+		// Not fatal: tasks of a run that is no longer running exit on their own (D-046).
+		console.warn("bulk cancel of older pipeline tasks failed", err);
+	}
+	return stopped.map((r) => r.id);
+}
+
+/** `supersede` stops whatever run is going (the dashboard's start); without it a running run blocks (the daily cron). */
 export async function startMigrationRun(
 	mode: ExportMode = "full",
-): Promise<{ runId: number }> {
+	{ supersede = false }: { supersede?: boolean } = {},
+): Promise<{ runId: number; superseded: number[] }> {
 	configureTrigger();
-	const [running] = await db
-		.select({ id: migrationRun.id })
-		.from(migrationRun)
-		.where(eq(migrationRun.status, "running"))
-		.limit(1);
-	if (running) throw new StartRunError(`run ${running.id} is still running`);
+	let superseded: number[] = [];
+	if (supersede) superseded = await supersedeRuns();
+	else {
+		const [running] = await db
+			.select({ id: migrationRun.id })
+			.from(migrationRun)
+			.where(eq(migrationRun.status, "running"))
+			.limit(1);
+		if (running) throw new StartRunError(`run ${running.id} is still running`);
+	}
 
 	const [run] = await db
 		.insert(migrationRun)
@@ -62,5 +105,5 @@ export async function startMigrationRun(
 			`Trigger.dev refused the run: ${err instanceof Error ? err.message : String(err)}`,
 		);
 	}
-	return { runId: run.id };
+	return { runId: run.id, superseded };
 }
