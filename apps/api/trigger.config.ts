@@ -29,6 +29,30 @@ function ytDlp(): BuildExtension {
 	};
 }
 
+// Upstream's rsgain .deb targets trixie, so its static Linux build; streamrip in its own venv, off the system Python (#4).
+const RSGAIN_VERSION = "3.8";
+const STREAMRIP_VERSION = "2.1.0";
+
+function rsgainAndStreamrip(): BuildExtension {
+	return {
+		name: "rsgain-streamrip",
+		onBuildComplete(context) {
+			if (context.target === "dev") return;
+			context.addLayer({
+				id: "rsgain-streamrip",
+				image: {
+					instructions: [
+						`ADD https://github.com/complexlogic/rsgain/releases/download/v${RSGAIN_VERSION}/rsgain-${RSGAIN_VERSION}-Linux.tar.xz /tmp/rsgain.tar.xz`,
+						"RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv xz-utils && rm -rf /var/lib/apt/lists/*",
+						"RUN mkdir -p /opt/rsgain && tar -xJf /tmp/rsgain.tar.xz -C /opt/rsgain --strip-components=1 && ln -s /opt/rsgain/rsgain /usr/local/bin/rsgain && rm /tmp/rsgain.tar.xz",
+						`RUN python3 -m venv /opt/streamrip && /opt/streamrip/bin/pip install --no-cache-dir --only-binary=:all: streamrip==${STREAMRIP_VERSION} && ln -s /opt/streamrip/bin/rip /usr/local/bin/rip`,
+					],
+				},
+			});
+		},
+	};
+}
+
 // The deploy indexer imports every task file in the image build, with no app env; build.env never reaches runs.
 function skipEnvValidationAtIndex(): BuildExtension {
 	return {
@@ -57,9 +81,16 @@ export default defineConfig({
 		extensions: [
 			ffmpeg(),
 			aptGet({
-				packages: ["libchromaprint-tools", "python3", "python3-mutagen", "sox"],
+				packages: [
+					"aria2",
+					"libchromaprint-tools",
+					"python3",
+					"python3-mutagen",
+					"sox",
+				],
 			}),
 			ytDlp(),
+			rsgainAndStreamrip(),
 			skipEnvValidationAtIndex(),
 			// The api app's env, written by the production deploy step, so runs share its database and secrets.
 			syncEnvVars(
