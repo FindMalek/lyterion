@@ -173,6 +173,47 @@ describe("exportLibrary", () => {
 		expect(tokens).toEqual([false, true]);
 		expect(calls).toBe(2);
 	});
+
+	it("keeps one save and one playlist when spotify's paging repeats them", async () => {
+		const liked = (n: number) => ({
+			added_at: `2024-01-0${n}T00:00:00Z`,
+			track: albumTrack(`l${n}`, n),
+		});
+		const drive = { id: "p1", name: "Drive", owner: { id: "me" } };
+		const repeated: Record<string, unknown> = {
+			[`${A}/me/tracks?limit=50&market=from_token`]: {
+				items: [liked(1), liked(2)],
+				next: `${A}/me/tracks?offset=2`,
+			},
+			// A like added mid-export shifts the list, so l2 comes back on the next page.
+			[`${A}/me/tracks?offset=2`]: { items: [liked(2), liked(3)], next: null },
+			[`${A}/me/albums?limit=50&market=from_token`]: { items: [], next: null },
+			[`${A}/me/following?type=artist&limit=50`]: {
+				artists: { items: [], next: null },
+			},
+			[`${A}/me/playlists?limit=50`]: {
+				items: [drive],
+				next: `${A}/me/playlists?offset=1`,
+			},
+			[`${A}/me/playlists?offset=1`]: { items: [drive], next: null },
+			[`${A}/playlists/p1/items?limit=100&market=from_token&additional_types=track`]:
+				{ items: [{ track: blinding }], next: null },
+		};
+		const client = createSpotifyClient(
+			async () => "token",
+			async (url) => {
+				const key = String(url);
+				if (!(key in repeated)) throw new Error(`unexpected ${key}`);
+				return Response.json(repeated[key]);
+			},
+		);
+
+		const out = await exportLibrary(client);
+
+		expect(out.saves.map((s) => s.spotifyId)).toEqual(["l1", "l2", "l3"]);
+		expect(out.playlists.map((p) => p.id)).toEqual(["p1"]);
+		expect(out.entries).toHaveLength(1);
+	});
 });
 
 describe("exportLibrary incremental", () => {
