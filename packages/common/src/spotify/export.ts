@@ -169,6 +169,12 @@ export async function exportLibrary(
 		skipped: { episodes: 0, removed: 0 },
 	};
 	const paged = <T>(page: unknown) => page as Paged<T>;
+	// Spotify's offset paging repeats an item when the list shifts mid-export, and one upsert can't touch a row twice.
+	const seen = new Set<string>();
+	const firstTime = (key: string) => !seen.has(key) && !!seen.add(key);
+	const pushSave = (row: SaveRow) => {
+		if (firstTime(`${row.kind}:${row.spotifyId}`)) out.saves.push(row);
+	};
 	// Saves come newest first, so the first known item older than the last sync means the rest is known.
 	const isOld = (key: string, addedAt: string) =>
 		!!incremental &&
@@ -196,7 +202,7 @@ export async function exportLibrary(
 		for (const { added_at, track } of items) {
 			const id = track ? addTrack(track) : null;
 			if (id)
-				out.saves.push({
+				pushSave({
 					kind: "liked_track",
 					spotifyId: id,
 					addedAt: new Date(added_at),
@@ -216,7 +222,7 @@ export async function exportLibrary(
 		for (const { added_at, album } of items) {
 			if (isOld(`saved_album:${album.id}`, added_at)) caughtUp = true;
 			out.albums.set(album.id, albumRow(album));
-			out.saves.push({
+			pushSave({
 				kind: "saved_album",
 				spotifyId: album.id,
 				addedAt: new Date(added_at),
@@ -246,7 +252,7 @@ export async function exportLibrary(
 				name: artist.name,
 				genres: artist.genres ?? [],
 			});
-			out.saves.push({
+			pushSave({
 				kind: "followed_artist",
 				spotifyId: artist.id,
 				addedAt: null,
@@ -269,6 +275,7 @@ export async function exportLibrary(
 	)) {
 		await hooks.onPage?.("me/playlists", items);
 		for (const playlist of items) {
+			if (!firstTime(`playlist:${playlist.id}`)) continue;
 			const row: PlaylistRow = {
 				id: playlist.id,
 				name: playlist.name,
