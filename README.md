@@ -91,6 +91,8 @@ Images are built on GitHub runners and pushed to `ghcr.io/findmalek/lyterion-{ap
 on `the-keep` redeploys `lyterion-dashboard` and `lyterion-api`; the api runs migrations on start. Every PR
 gets its own preview apps and database with a sticky status comment. See [docs/infra.md](docs/infra.md).
 
+Setting up an instance from scratch, Proton VPN included: [docs/setup.md](docs/setup.md).
+
 ## Docs
 
 Start at [docs/README.md](docs/README.md). [decisions.md](docs/decisions.md) holds every settled decision

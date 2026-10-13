@@ -195,7 +195,7 @@ Setup, once:
 8. **Tasks:** the next push to `main` (or Actions → Deploy) runs
    `pnpm deploy:trigger`. Then Tasks → `tools.check` → Test: the run prints
    every tool version (ffmpeg, ffprobe, fpcalc, sox, python3, mutagen,
-   yt-dlp) and fails naming any that is missing.
+   yt-dlp, rsgain, rip, aria2c) and fails naming any that is missing.
 
 **Host folders in runs (#5, D-043):** the supervisor is our own image,
 `ghcr.io/findmalek/lyterion-supervisor`, which is upstream plus

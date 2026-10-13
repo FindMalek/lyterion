@@ -4,6 +4,7 @@ Read in this order:
 
 | doc | what |
 |---|---|
+| [setup.md](setup.md) | every step to get an instance running, start to finish |
 | [brief.md](brief.md) | original context from the sonaraem discussion. `decisions.md` overrides it |
 | [decisions.md](decisions.md) | every settled decision, numbered, with the why. Append, never rewrite |
 | [open-questions.md](open-questions.md) | unanswered questions and spikes that block decisions |
