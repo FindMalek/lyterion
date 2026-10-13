@@ -6,12 +6,10 @@ import { env } from "@lyterion/env/server";
 import { logger, task } from "@trigger.dev/sdk";
 import { and, eq, isNotNull } from "drizzle-orm";
 
+import { lrclibPace } from "../../acquire/persist";
 import { fetchLyrics, lrcPath, writeLyrics } from "../../library/extras";
 import { writeTags } from "../../library/place";
 import { requestScan } from "./navidrome-scan";
-
-// LRCLIB is a free community service; one lookup a second keeps a full backfill polite.
-const GAP_MS = 1_000;
 
 async function exists(path: string): Promise<boolean> {
 	try {
@@ -63,12 +61,16 @@ export const lyricsBackfillTask = task({
 				}
 				continue;
 			}
-			const lyrics = await fetchLyrics({
-				artist: file.artists[0] ?? "",
-				title: file.title,
-				album: file.album,
-				durationMs: file.durationMs,
-			}).catch((err: unknown) => {
+			const lyrics = await fetchLyrics(
+				{
+					artist: file.artists[0] ?? "",
+					title: file.title,
+					album: file.album,
+					durationMs: file.durationMs,
+				},
+				fetch,
+				lrclibPace,
+			).catch((err: unknown) => {
 				logger.warn("lrclib lookup failed", { path: file.path, err });
 				return null;
 			});
@@ -87,7 +89,6 @@ export const lyricsBackfillTask = task({
 					logger.warn("lyrics write failed", { path: file.path, err });
 				}
 			} else missed++;
-			await new Promise((r) => setTimeout(r, GAP_MS));
 		}
 		if (found + embedded > 0) await requestScan(found + embedded);
 		logger.info("lyrics backfill done", { found, missed, embedded });

@@ -109,6 +109,15 @@ function lyricsOf(record: LrclibRecord): string | null {
 	return record.syncedLyrics?.trim() || record.plainLyrics?.trim() || null;
 }
 
+// LRCLIB joins performers into one string ("A, B", "A feat. B", "A & B"); the lead is the part before the first separator.
+export function firstArtist(name: string): string {
+	return (
+		name.split(
+			/\s*(?:,|;|&|\/|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b|\bx\b)\s*/i,
+		)[0] ?? ""
+	);
+}
+
 /** True when a search hit is the same song: same title, version (live, remix…) and first artist after normalizing, length within 2s. */
 export function sameSong(query: LrclibQuery, record: LrclibRecord): boolean {
 	if (record.duration == null) return false;
@@ -121,16 +130,20 @@ export function sameSong(query: LrclibQuery, record: LrclibRecord): boolean {
 	if (!title.base || title.base !== found.base) return false;
 	if ([...title.flags].sort().join() !== [...found.flags].sort().join())
 		return false;
-	const artist = normalizeArtist(query.artist);
-	return normalizeArtist(record.artistName ?? "").includes(artist);
+	return (
+		normalizeArtist(firstArtist(record.artistName ?? "")) ===
+		normalizeArtist(firstArtist(query.artist))
+	);
 }
 
 /** LRCLIB synced lyrics, else plain: exact match, then without the album (Spotify's rarely matches), then a search filtered by sameSong. */
 export async function fetchLyrics(
 	query: LrclibQuery,
 	doFetch: typeof fetch = fetch,
+	pace?: () => Promise<void>,
 ): Promise<string | null> {
 	async function call(url: string): Promise<unknown | null> {
+		await pace?.();
 		const res = await doFetch(url, {
 			headers: LRCLIB_HEADERS,
 			signal: AbortSignal.timeout(10_000),
@@ -157,7 +170,9 @@ export async function fetchLyrics(
 		`${LRCLIB}/search?${new URLSearchParams({ track_name: query.title, artist_name: query.artist })}`,
 	)) as LrclibRecord[] | null;
 	const matches = (hits ?? []).filter((h) => sameSong(query, h));
-	const best = matches.find((h) => h.syncedLyrics) ?? matches[0];
+	const best =
+		matches.find((h) => !h.instrumental && h.syncedLyrics?.trim()) ??
+		matches.find((h) => !h.instrumental && h.plainLyrics?.trim());
 	return best ? lyricsOf(best) : null;
 }
 

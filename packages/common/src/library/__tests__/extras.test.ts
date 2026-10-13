@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	albumLoudnessArgs,
 	fetchLyrics,
+	firstArtist,
 	lrcPath,
 	parseEbur128,
 	replayGainTags,
@@ -182,5 +183,54 @@ describe("lyrics lookup order", () => {
 				duration: 330,
 			}),
 		).toBe(false);
+	});
+
+	it("compares the lead artist exactly, not as a substring", () => {
+		const nat = {
+			artist: "The National",
+			title: "Bloodbuzz Ohio",
+			album: null,
+			durationMs: 276_000,
+		};
+		expect(
+			sameSong(nat, {
+				trackName: "Bloodbuzz Ohio",
+				artistName: "The National Parks",
+				duration: 276,
+			}),
+		).toBe(false);
+		expect(
+			sameSong(nat, {
+				trackName: "Bloodbuzz Ohio",
+				artistName: "The National feat. Sufjan Stevens",
+				duration: 276,
+			}),
+		).toBe(true);
+		expect(firstArtist("Simon & Garfunkel")).toBe("Simon");
+		expect(firstArtist("Massive Attack, Elizabeth Fraser")).toBe(
+			"Massive Attack",
+		);
+	});
+
+	it("skips matched hits without lyrics and paces every request", async () => {
+		const { doFetch, urls } = lrclib({
+			search: [
+				{ trackName: "Teardrop", artistName: "Massive Attack", duration: 330 },
+				{
+					trackName: "Teardrop",
+					artistName: "Massive Attack",
+					duration: 330,
+					plainLyrics: "plain",
+				},
+			],
+		});
+		let paced = 0;
+		expect(
+			await fetchLyrics(q, doFetch, async () => {
+				paced++;
+			}),
+		).toBe("plain");
+		expect(paced).toBe(urls.length);
+		expect(paced).toBe(3);
 	});
 });
