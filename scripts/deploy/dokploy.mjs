@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Preview and production deploys on the-keep through the Dokploy API (D-036), see docs/infra.md.
 import { randomBytes } from "node:crypto";
+import { writeFile } from "node:fs/promises";
 
 const MODE = process.argv[2];
 const COMMENT_MARKER = "<!-- lyterion-preview -->";
@@ -415,6 +416,11 @@ async function production() {
 		postgresId: pg.postgresId,
 		sharedEnv,
 	});
+	// Task runs need the api's env too; the Trigger.dev deploy syncs this file into its prod environment (#4).
+	if (process.env.TRIGGER_ENV_FILE)
+		await writeFile(process.env.TRIGGER_ENV_FILE, JSON.stringify(apps[0].env), {
+			mode: 0o600,
+		});
 	const deployed = await deployAll(environment, apps);
 	const ok = await waitForApps(deployed, async () => {});
 	for (const d of deployed) console.info(`${d.name}: ${d.status}`);

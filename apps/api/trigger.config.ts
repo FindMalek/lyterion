@@ -1,8 +1,10 @@
+import { readFile } from "node:fs/promises";
 import type { BuildExtension } from "@trigger.dev/build/extensions";
 import {
 	additionalFiles,
 	aptGet,
 	ffmpeg,
+	syncEnvVars,
 } from "@trigger.dev/build/extensions/core";
 import { defineConfig } from "@trigger.dev/sdk";
 
@@ -27,6 +29,20 @@ function ytDlp(): BuildExtension {
 	};
 }
 
+// The deploy indexer imports every task file in the image build, with no app env; build.env never reaches runs.
+function skipEnvValidationAtIndex(): BuildExtension {
+	return {
+		name: "skip-env-validation-at-index",
+		onBuildComplete(context) {
+			if (context.target === "dev") return;
+			context.addLayer({
+				id: "skip-env-validation-at-index",
+				build: { env: { SKIP_ENV_VALIDATION: "true" } },
+			});
+		},
+	};
+}
+
 export default defineConfig({
 	// process.env, not apiEnv: apiEnv validates the whole api schema eagerly, which `trigger deploy` doesn't have.
 	project:
@@ -44,6 +60,19 @@ export default defineConfig({
 				packages: ["libchromaprint-tools", "python3", "python3-mutagen", "sox"],
 			}),
 			ytDlp(),
+			skipEnvValidationAtIndex(),
+			// The api app's env, written by the production deploy step, so runs share its database and secrets.
+			syncEnvVars(
+				async () => {
+					const file = process.env.TRIGGER_ENV_FILE;
+					if (!file) return;
+					return JSON.parse(await readFile(file, "utf8")) as Record<
+						string,
+						string
+					>;
+				},
+				{ override: true },
+			),
 			additionalFiles({
 				files: ["../../packages/common/python/write_tags.py"],
 			}),
