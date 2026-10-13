@@ -1,8 +1,10 @@
+import { readFile } from "node:fs/promises";
 import type { BuildExtension } from "@trigger.dev/build/extensions";
 import {
 	additionalFiles,
 	aptGet,
 	ffmpeg,
+	syncEnvVars,
 } from "@trigger.dev/build/extensions/core";
 import { defineConfig } from "@trigger.dev/sdk";
 
@@ -60,6 +62,18 @@ export default defineConfig({
 			}),
 			ytDlp(),
 			skipEnvValidationAtIndex(),
+			// The api app's env, written by the production deploy step, so runs share its database and secrets.
+			syncEnvVars(
+				async () => {
+					const file = process.env.TRIGGER_ENV_FILE;
+					if (!file) return;
+					return JSON.parse(await readFile(file, "utf8")) as Record<
+						string,
+						string
+					>;
+				},
+				{ override: true },
+			),
 			additionalFiles({
 				files: ["../../packages/common/python/write_tags.py"],
 			}),
