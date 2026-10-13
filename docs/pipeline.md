@@ -45,9 +45,10 @@ Manual:
   top-ups never overlap) and triggers them; every finished track tops the
   window up again. A failed trigger puts its claims back. A crash in one
   track counts it as failed once and the run goes on.
-- **Stale runs.** Acquire tasks whose run is no longer `running` exit
-  without work, and the next run frees anything a dead run left `waiting`
-  or in flight.
+- **Stale runs.** Starting a run from the dashboard cancels the one going
+  and bulk-cancels the pipeline tasks created before it (D-047). Acquire
+  tasks whose run is no longer `running` also exit without work, and the
+  next run frees anything a dead run left `waiting` or in flight.
 - **Errors** land in the stage's `error` field and show under the run in
   the dashboard.
 - The dashboard streams progress with Trigger realtime or polls the run row.

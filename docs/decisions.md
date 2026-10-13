@@ -528,6 +528,18 @@ incremental export, which falls back to a full one until a full export
 has finished, so a re-run reads only what changed on Spotify. Stage
 errors are stored on the run and shown in the dashboard.
 
+## D-047 Starting a run stops the one before it (2026-10-13)
+
+Malek asked that a new run never overlap an old one. The dashboard's start
+(shown as "restart run" while one is going, with a confirming second
+click) marks any `running` run `cancelled`, then bulk-cancels every live
+`spotify.export`, `identity.resolve`, `acquire.recording` and
+`acquire.release` task created before that moment. That covers tasks pinned
+to older deploy versions, which can't know D-046's stale-run check. The new
+run's own tasks are never caught, because the filter stops at the click.
+The daily `spotify.sync` cron still skips while a run is going, so it never
+stops a long first run.
+
 ## D-048 YouTube Music is always on, through a PO-token server instead of cookies (2026-10-13)
 
 YouTube was gated on `LYTERION_YTDLP_COOKIES_PATH`, which was never set, so

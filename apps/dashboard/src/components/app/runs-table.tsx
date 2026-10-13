@@ -38,6 +38,7 @@ export function RunsTable() {
 		meta: { silent: true },
 	});
 	const [confirmFinal, setConfirmFinal] = useState(false);
+	const [confirmRestart, setConfirmRestart] = useState(false);
 
 	return (
 		<section>
@@ -68,15 +69,23 @@ export function RunsTable() {
 					)}
 					<button
 						type="button"
-						disabled={running || start.isPending}
-						onClick={() => start.mutate({})}
+						disabled={start.isPending}
+						onBlur={() => setConfirmRestart(false)}
+						onClick={() => {
+							// A new run stops the one going and cancels its queued tasks, so that takes a second click.
+							if (running && !confirmRestart) return setConfirmRestart(true);
+							setConfirmRestart(false);
+							start.mutate({});
+						}}
 						className="shrink-0 font-mono text-xs hover:text-foreground disabled:text-muted-foreground/50"
 					>
 						{start.isPending
 							? "starting…"
-							: running
-								? "running"
-								: "start run →"}
+							: confirmRestart
+								? "click again: stop the current run and start over"
+								: running
+									? "restart run →"
+									: "start run →"}
 					</button>
 				</div>
 			</div>

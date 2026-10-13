@@ -39,7 +39,9 @@ export const runsRouter = {
 		)
 		.handler(async ({ input }) => {
 			try {
-				return await startMigrationRun(input?.mode ?? "incremental");
+				return await startMigrationRun(input?.mode ?? "incremental", {
+					supersede: true,
+				});
 			} catch (err) {
 				if (err instanceof StartRunError)
 					throw new ORPCError("PRECONDITION_FAILED", { message: err.message });
