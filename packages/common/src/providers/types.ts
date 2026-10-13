@@ -61,3 +61,8 @@ export interface Provider {
 	search(target: RecordingTarget): Promise<Candidate[]>;
 	fetch(candidate: Candidate, stagingDir: string): Promise<FetchedFile>;
 }
+
+/** A fetch the provider gave up on deliberately (a peer that never starts the upload); retrying the same candidate only burns the slot. */
+export class GiveUpError extends Error {
+	override name = "GiveUpError";
+}

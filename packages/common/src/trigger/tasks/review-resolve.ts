@@ -19,6 +19,7 @@ import {
 	stagedCandidate,
 } from "../../review/persist";
 import { verifyFile } from "../../verify/index";
+import { acquireQueue } from "./acquire-recording";
 import { requestScan } from "./navidrome-scan";
 
 export type ReviewPickPayload = { reviewId: number; candidateId: number };
@@ -35,7 +36,7 @@ async function exists(path: string) {
 // The owner's pick counts as full confidence; the file still has to decode and match the duration.
 export const reviewResolveTask = task({
 	id: "review.resolve",
-	queue: { name: "acquire", concurrencyLimit: 2 },
+	queue: acquireQueue,
 	maxDuration: 3600,
 	run: async ({ reviewId, candidateId }: ReviewPickPayload) => {
 		const review = await reviewForRecording(reviewId);

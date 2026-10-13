@@ -15,6 +15,7 @@ import type {
 	ProviderHealth,
 	RecordingTarget,
 } from "./types";
+import { GiveUpError } from "./types";
 
 // slskd REST (/api/v0), docs/providers.md § slskd. Soulseek penalizes search floods, so searches are paced.
 export const MIN_SEARCH_GAP_MS = 5_000;
@@ -22,7 +23,10 @@ const SEARCH_TIMEOUT_MS = 15_000;
 const POLL_MS = 1_000;
 const DURATION_TOLERANCE_S = 3;
 const MAX_CANDIDATES = 20;
-const DOWNLOAD_TIMEOUT_MS = 30 * 60_000;
+const DOWNLOAD_TIMEOUT_MS = 20 * 60_000;
+// A peer that keeps the file queued, or a transfer that stops moving, frees the slot for the next candidate.
+export const QUEUED_LIMIT_MS = 3 * 60_000;
+export const STALL_LIMIT_MS = 2 * 60_000;
 
 const FORMATS: Record<string, AudioFormat> = {
 	flac: "flac",
@@ -54,6 +58,7 @@ export type SlskdResponse = {
 };
 
 type TransferFile = {
+	id?: string;
 	filename: string;
 	state: string;
 	bytesTransferred?: number;
@@ -288,8 +293,13 @@ export function createSlskdProvider(options: SlskdOptions): Provider & {
 				method: "POST",
 				body: JSON.stringify([{ filename: ref.filename, size: ref.size }]),
 			});
-			const deadline = now() + DOWNLOAD_TIMEOUT_MS;
+			const started = now();
+			const deadline = started + DOWNLOAD_TIMEOUT_MS;
+			let lastBytes = -1;
+			let movedAt = started;
 			let done = false;
+			let gaveUp: string | null = null;
+			let transferId: string | undefined;
 			while (!done && now() < deadline) {
 				const transfers = await api<{
 					directories?: { files: TransferFile[] }[];
@@ -297,6 +307,7 @@ export function createSlskdProvider(options: SlskdOptions): Provider & {
 				const file = transfers.directories
 					?.flatMap((d) => d.files)
 					.find((f) => f.filename === ref.filename);
+				transferId = file?.id ?? transferId;
 				if (file?.state.includes("Succeeded")) {
 					done = true;
 					break;
@@ -306,9 +317,31 @@ export function createSlskdProvider(options: SlskdOptions): Provider & {
 					/Errored|Rejected|Cancelled|TimedOut|Failed/.test(file.state)
 				)
 					throw new Error(`slskd download ${file.state}: ${ref.filename}`);
+				const bytes = file?.bytesTransferred ?? 0;
+				if (bytes > lastBytes) {
+					lastBytes = bytes;
+					movedAt = now();
+				}
+				if (bytes === 0 && now() - started > QUEUED_LIMIT_MS) {
+					gaveUp = `still ${file?.state ?? "not started"} after ${QUEUED_LIMIT_MS / 60_000} min`;
+					break;
+				}
+				if (bytes > 0 && now() - movedAt > STALL_LIMIT_MS) {
+					gaveUp = `stalled at ${Math.round((bytes / (file?.size ?? ref.size)) * 100)}% for ${STALL_LIMIT_MS / 60_000} min`;
+					break;
+				}
 				await sleep(POLL_MS * 5);
 			}
-			if (!done) throw new Error(`slskd download timed out: ${ref.filename}`);
+			if (!done) {
+				if (transferId)
+					await api(
+						`/transfers/downloads/${user}/${encodeURIComponent(transferId)}?remove=true`,
+						{ method: "DELETE" },
+					).catch(() => undefined);
+				throw new GiveUpError(
+					`slskd download ${gaveUp ?? "timed out"}: ${ref.filename}`,
+				);
+			}
 			// slskd writes to <downloads>/<remote folder>/<file name>.
 			const { dir, base: name } = splitSoulseekPath(ref.filename);
 			const source = path.join(options.downloadsDir, dir, name);

@@ -576,6 +576,19 @@ downloaded file carries them too. `lyrics.backfill` (Library → fetch
 lyrics) embeds existing sidecars and looks up the rest, one LRCLIB call a
 second.
 
+## D-052 Acquire runs 8 at a time, and a stuck Soulseek download gives up (2026-10-13, #118)
+
+Run 4 placed about 10 tracks in 32 minutes. The `acquire` queue allowed 2
+tasks at once, so D-046's window of 20 never mattered, and a Soulseek
+download that sat in a peer's upload queue held one of the two slots for up
+to 30 minutes. The queue now runs 8 at once (the-keep has 6 cores; most of a
+task's time is network waits). `review.resolve` and `quality.upgrade` share
+the same queue object instead of redeclaring it. A Soulseek transfer that is
+still queued after 3 minutes, or stops moving for 2, is cancelled in slskd
+and the next candidate is tried; the hard cap drops to 20 minutes. Search
+pacing (one slskd search every 5s) is unchanged, so the ceiling is about 12
+tracks a minute.
+
 ## D-051 Dashboard v2: Geist, 14px, the kit everywhere (2026-10-13, amends D-015)
 
 Malek found the dashboard too small and inconsistent. Every screen now builds

@@ -22,6 +22,7 @@ import {
 import { describeQuality, isUpgrade } from "../../upgrade/quality";
 import { createAcoustidClient } from "../../verify/acoustid";
 import { verifyFile } from "../../verify/index";
+import { acquireQueue } from "./acquire-recording";
 import { requestScan } from "./navidrome-scan";
 
 const UPGRADE_PRIORITY: Record<string, number> = {
@@ -185,7 +186,7 @@ async function clearSignal(
 
 export const qualityUpgradeTask = task({
 	id: "quality.upgrade",
-	queue: { name: "acquire", concurrencyLimit: 2 },
+	queue: acquireQueue,
 	maxDuration: 6 * 3600,
 	run: (payload: { fileIds?: number[] }) => runUpgrade(payload.fileIds),
 });
