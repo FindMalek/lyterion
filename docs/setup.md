@@ -138,7 +138,7 @@ ranking (D-017, D-022) only picks a weaker file when nothing better exists.
 | Deezer ARL | you have any Deezer account | free account: MP3 128, below the transparent line, so only a last-resort fill that gets queued for upgrade. Premium: MP3 320 / FLAC. Value of the `arl` cookie on deezer.com |
 | Proxy backends | you have hifi-api style backend urls | Tidal/Qobuz/Deezer FLAC, health-checked and rotated |
 | Lidarr | you already run Lidarr with indexers | whole-album fills for saved albums still missing tracks |
-| YouTube Music | already on, no setup | Opus ~160 (transparent). Cookies only matter once YouTube starts blocking |
+| YouTube Music | always on, no setup | Opus ~160 (transparent). The `bgutil-pot` service in the services stack hands yt-dlp the PO tokens YouTube's bot checks want, so no cookies are needed (D-048) |
 
 Downtify isn't a separate source: it wraps spotDL, which downloads from
 YouTube Music, the same audio Lyterion already gets through yt-dlp.

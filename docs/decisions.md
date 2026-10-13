@@ -527,3 +527,14 @@ no longer `running` exit without work. `start run` defaults to the
 incremental export, which falls back to a full one until a full export
 has finished, so a re-run reads only what changed on Spotify. Stage
 errors are stored on the run and shown in the dashboard.
+
+## D-048 YouTube Music is always on, through a PO-token server instead of cookies (2026-10-13)
+
+YouTube was gated on `LYTERION_YTDLP_COOKIES_PATH`, which was never set, so
+the source D-045 counts on for the daily sync never ran. Cookies tie
+downloads to a Google account that can get flagged, and they expire. The
+`bgutil-pot` container (`brainicism/bgutil-ytdlp-pot-provider`) in the
+services stack mints the PO tokens yt-dlp needs, and the task image carries
+its yt-dlp plugin, same version. `LYTERION_YTDLP_POT_PROVIDER_URL` defaults to
+`http://bgutil-pot:4416` on `dokploy-network`. Cookies stay an optional extra
+for when YouTube tightens again.

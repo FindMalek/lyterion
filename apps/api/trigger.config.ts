@@ -10,6 +10,8 @@ import { defineConfig } from "@trigger.dev/sdk";
 
 // Debian's yt-dlp is too old for YouTube, so the pinned standalone release goes in the image (#4).
 const YT_DLP_VERSION = "2026.08.19";
+// Must match the bgutil-pot server's version in infra/the-keep/services*.compose.yml.
+const BGUTIL_POT_VERSION = "2.0.1";
 
 function ytDlp(): BuildExtension {
 	return {
@@ -22,6 +24,8 @@ function ytDlp(): BuildExtension {
 					instructions: [
 						`ADD https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp /usr/local/bin/yt-dlp`,
 						"RUN chmod 755 /usr/local/bin/yt-dlp",
+						`ADD https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_POT_VERSION}/bgutil-ytdlp-pot-provider.zip /etc/yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip`,
+						"RUN chmod 644 /etc/yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip",
 					],
 				},
 			});

@@ -126,6 +126,7 @@ to:
 | `gluetun` | none from outside | Proton WireGuard, port forwarding on (D-030, D-033). Kill switch: slskd has no network when the tunnel is down |
 | `slskd-config` | none | renders `slskd.yml` and rewrites `listen_port` when Proton rotates the forwarded port; slskd reloads the file. The deploy passes `slskd-config.sh` in as base64, since a raw Dokploy compose has no repo files beside it |
 | `slskd` | `http://slskd:5030` on `dokploy-network` | shares `/srv/music` read only, downloads to `/srv/lyterion/slskd-downloads`. LAN only, no Traefik route |
+| `bgutil-pot` | `http://bgutil-pot:4416` on `dokploy-network` | PO tokens for yt-dlp, so YouTube downloads need no cookies (D-048). Its version matches the yt-dlp plugin in `apps/api/trigger.config.ts` |
 | `ntfy` | `http://ntfy` on `dokploy-network`, public at `ntfy.findmalek.engineer` | access control on, deny-all by default (D-034) |
 
 Repo settings for the Infra run:

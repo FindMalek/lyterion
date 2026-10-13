@@ -44,6 +44,16 @@ services:
         aliases:
           - slskd
 
+  # PO tokens for yt-dlp (bgutil), so YouTube downloads pass its bot checks without cookies. Same version as the plugin in apps/api/trigger.config.ts.
+  bgutil-pot:
+    image: brainicism/bgutil-ytdlp-pot-provider:2.0.1
+    restart: unless-stopped
+    init: true
+    networks:
+      dokploy-network:
+        aliases:
+          - bgutil-pot
+
   ntfy:
     image: binwiederhier/ntfy:v2.11.0
     restart: unless-stopped

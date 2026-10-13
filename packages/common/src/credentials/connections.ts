@@ -45,7 +45,7 @@ export async function resolveConnectionsEnv(
 		proxyBackends: proxy?.backends ?? [],
 		lidarr: lidarr ?? undefined,
 		deezerArl: deezer?.arl,
-		ytdlpCookiesPath: env.LYTERION_YTDLP_COOKIES_PATH,
+		ytdlpPotUrl: env.LYTERION_YTDLP_POT_PROVIDER_URL,
 		acoustidKey: acoustid?.apiKey,
 		groqKey: groq?.apiKey,
 		jevKey: jev?.apiKey,
