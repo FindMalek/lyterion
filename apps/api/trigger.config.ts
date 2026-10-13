@@ -27,6 +27,21 @@ function ytDlp(): BuildExtension {
 	};
 }
 
+// The deploy indexer imports every task file inside the image build, where no app env exists.
+// build.env only reaches the build and indexer stages, so runs still validate their env.
+function skipEnvValidationAtIndex(): BuildExtension {
+	return {
+		name: "skip-env-validation-at-index",
+		onBuildComplete(context) {
+			if (context.target === "dev") return;
+			context.addLayer({
+				id: "skip-env-validation-at-index",
+				build: { env: { SKIP_ENV_VALIDATION: "true" } },
+			});
+		},
+	};
+}
+
 export default defineConfig({
 	// process.env, not apiEnv: apiEnv validates the whole api schema eagerly, which `trigger deploy` doesn't have.
 	project:
@@ -44,6 +59,7 @@ export default defineConfig({
 				packages: ["libchromaprint-tools", "python3", "python3-mutagen", "sox"],
 			}),
 			ytDlp(),
+			skipEnvValidationAtIndex(),
 			additionalFiles({
 				files: ["../../packages/common/python/write_tags.py"],
 			}),
