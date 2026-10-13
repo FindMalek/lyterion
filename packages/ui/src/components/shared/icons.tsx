@@ -43,6 +43,7 @@ import {
 	IconMinus,
 	IconMoon,
 	IconMusic,
+	IconPlayerPause,
 	IconPlayerPlay,
 	IconPlus,
 	IconSearch,
@@ -53,6 +54,8 @@ import {
 	IconTrash,
 	IconUser,
 	IconUsers,
+	IconVolume,
+	IconVolumeOff,
 	IconX,
 } from "@tabler/icons-react";
 import type * as React from "react";
@@ -98,6 +101,9 @@ export const Icons = {
 	brain: IconBrain,
 	layers: IconStack2,
 	play: IconPlayerPlay,
+	pause: IconPlayerPause,
+	volume: IconVolume,
+	volumeOff: IconVolumeOff,
 
 	// Layout
 	layoutSidebar: IconLayoutSidebar,

@@ -10,6 +10,8 @@ export { Icons } from "./components/shared/icons";
 export { Logo } from "./components/shared/logo";
 export { ModeToggle } from "./components/shared/mode-toggle";
 export { UserMenu } from "./components/shared/user-menu";
+// The rest of the shadcn kit, so every screen builds from the same parts.
+export * from "./components/ui/accordion";
 export {
 	Alert,
 	AlertAction,
@@ -30,6 +32,7 @@ export {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "./components/ui/alert-dialog";
+export * from "./components/ui/avatar";
 export { Badge, badgeVariants } from "./components/ui/badge";
 export {
 	Breadcrumb,
@@ -41,6 +44,7 @@ export {
 	BreadcrumbSeparator,
 } from "./components/ui/breadcrumb";
 export { Button, buttonVariants } from "./components/ui/button";
+export * from "./components/ui/button-group";
 export {
 	Card,
 	CardAction,
@@ -65,6 +69,8 @@ export {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "./components/ui/collapsible";
+export * from "./components/ui/command";
+export * from "./components/ui/dialog";
 export * from "./components/ui/drawer";
 export {
 	DropdownMenu,
@@ -83,6 +89,7 @@ export {
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "./components/ui/dropdown-menu";
+export * from "./components/ui/empty";
 export {
 	Field,
 	FieldContent,
@@ -95,6 +102,7 @@ export {
 	FieldSet,
 	FieldTitle,
 } from "./components/ui/field";
+export * from "./components/ui/hover-card";
 export { Input } from "./components/ui/input";
 export {
 	InputGroup,
@@ -108,8 +116,13 @@ export {
 	InsightSectionCard,
 	InsightStatCard,
 } from "./components/ui/insight-stat-card";
+export * from "./components/ui/item";
+export * from "./components/ui/kbd";
 export { Label } from "./components/ui/label";
+export * from "./components/ui/pagination";
+export * from "./components/ui/popover";
 export { Progress } from "./components/ui/progress";
+export * from "./components/ui/radio-group";
 export { ScrollArea, ScrollBar } from "./components/ui/scroll-area";
 export {
 	Select,
@@ -160,6 +173,7 @@ export {
 	useSidebar,
 } from "./components/ui/sidebar";
 export { Skeleton } from "./components/ui/skeleton";
+export * from "./components/ui/slider";
 export { Toaster } from "./components/ui/sonner";
 export { Spinner } from "./components/ui/spinner";
 export { Switch } from "./components/ui/switch";
@@ -181,6 +195,8 @@ export {
 	tabsListVariants,
 } from "./components/ui/tabs";
 export { Textarea } from "./components/ui/textarea";
+export * from "./components/ui/toggle";
+export * from "./components/ui/toggle-group";
 export {
 	Tooltip,
 	TooltipContent,

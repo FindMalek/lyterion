@@ -140,6 +140,25 @@ function envText(vars) {
 		.join("\n");
 }
 
+// Bind mounts the app needs (the api reads review previews from staging); added once, kept on redeploys.
+async function ensureMounts(applicationId, mounts = []) {
+	if (mounts.length === 0) return;
+	const existing = await query("mounts.listByServiceId", {
+		serviceId: applicationId,
+		serviceType: "application",
+	});
+	for (const m of mounts) {
+		if (existing.some((e) => e.mountPath === m.mountPath)) continue;
+		await dokploy("mounts.create", {
+			type: "bind",
+			hostPath: m.hostPath,
+			mountPath: m.mountPath,
+			serviceType: "application",
+			serviceId: applicationId,
+		});
+	}
+}
+
 async function deployApp(environment, app) {
 	const application = await ensureApplication(environment, app.name);
 	const { applicationId } = application;
@@ -158,6 +177,7 @@ async function deployApp(environment, app) {
 		createEnvFile: false,
 	});
 	await ensureDomain(applicationId, app.host, app.port);
+	await ensureMounts(applicationId, app.mounts);
 	await dokploy("application.deploy", { applicationId });
 	// project.all leaves appName off its application rows, and it is the swarm service name other apps dial.
 	const { appName } = await query("application.one", { applicationId });
@@ -317,6 +337,16 @@ function appSpecs({
 			host: apiHost,
 			port: 3001,
 			status: "building",
+			// Review previews stream near misses kept in staging; previews have no staging, so production only.
+			mounts: tag.startsWith("pr-")
+				? []
+				: [
+						{
+							hostPath:
+								process.env.STAGING_HOST_PATH || "/srv/lyterion/staging",
+							mountPath: "/staging",
+						},
+					],
 			env: {
 				...sharedEnv,
 				...common,
