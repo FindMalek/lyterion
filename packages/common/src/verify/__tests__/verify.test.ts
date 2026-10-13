@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { Candidate } from "../../providers/types";
+import { decodeIsClean } from "../audio";
 import { fingerprintVerdict, verifyFile } from "../index";
 
 const hasFfmpeg = (() => {
@@ -139,5 +140,22 @@ describe("fingerprintVerdict", () => {
 			),
 		).toBe("unknown");
 		expect(fingerprintVerdict(results, [])).toBe("unknown");
+	});
+});
+
+describe("decodeIsClean", () => {
+	it("passes a clean decode and a few stray frame errors", () => {
+		expect(decodeIsClean("")).toBe(true);
+		expect(
+			decodeIsClean(
+				"[mp3float @ 0x1] Header missing\n[mp3float @ 0x1] invalid new backstep -1\n",
+			),
+		).toBe(true);
+	});
+
+	it("fails a file that errors all the way through", () => {
+		expect(decodeIsClean("[flac @ 0x1] invalid sync code\n".repeat(6))).toBe(
+			false,
+		);
 	});
 });
