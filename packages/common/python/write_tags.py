@@ -6,7 +6,7 @@ import sys
 import mutagen
 from mutagen.easyid3 import EasyID3
 from mutagen.flac import FLAC, Picture
-from mutagen.id3 import APIC, ID3, TXXX
+from mutagen.id3 import APIC, ID3, TXXX, USLT
 from mutagen.mp4 import MP4, MP4Cover, MP4FreeForm
 
 MP4_ATOMS = {
@@ -16,7 +16,16 @@ MP4_ATOMS = {
     "ALBUMARTIST": "aART",
     "DATE": "\xa9day",
     "GENRE": "\xa9gen",
+    "LYRICS": "\xa9lyr",
 }
+
+
+def add_lyrics(id3, values):
+    # ID3 keeps lyrics in USLT, which Navidrome reads (synced LRC text included) and serves to Subsonic clients.
+    id3.delall("USLT")
+    id3.delall("TXXX:LYRICS")
+    if values:
+        id3.add(USLT(encoding=3, lang="eng", desc="", text=values[0]))
 
 
 def picture(cover_path):
@@ -52,6 +61,7 @@ def write_id3(path, tags, cover):
     for number, total in (("TRACKNUMBER", "TRACKTOTAL"), ("DISCNUMBER", "DISCTOTAL")):
         if number in tags and total in tags:
             tags[number] = [f"{tags[number][0]}/{tags.pop(total)[0]}"]
+    lyrics = tags.pop("LYRICS", None)
     easy = EasyID3()
     extra = {}
     for key, values in tags.items():
@@ -64,6 +74,8 @@ def write_id3(path, tags, cover):
     id3 = ID3(path)
     for key, values in extra.items():
         id3.add(TXXX(encoding=3, desc=key, text=values))
+    if lyrics:
+        add_lyrics(id3, lyrics)
     if cover:
         with open(cover, "rb") as fh:
             id3.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=fh.read()))
@@ -99,6 +111,9 @@ def merge_tags(path, audio, tags):
     elif type(audio).__name__ in ("MP3", "EasyMP3"):
         id3 = ID3(path)
         for key, values in tags.items():
+            if key == "LYRICS":
+                add_lyrics(id3, values)
+                continue
             id3.delall(f"TXXX:{key}")
             id3.add(TXXX(encoding=3, desc=key, text=values))
         id3.save(path, v2_version=4)

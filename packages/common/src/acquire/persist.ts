@@ -199,22 +199,28 @@ export function createPlacer(job: AcquireJob, options: PlaceOptions) {
 			spotifyTrackId: target.spotifyTrackId,
 		});
 		// Loudness and lyrics are extras: a failure here never blocks placing the file (#45).
-		const loudness = await measureLoudness(staged).catch(() => null);
+		const [loudness, lyrics] = await Promise.all([
+			measureLoudness(staged).catch(() => null),
+			fetchLyrics({
+				artist: target.artists[0] ?? "",
+				title: target.title,
+				album: placement.album,
+				durationMs: target.durationMs,
+			}).catch(() => null),
+		]);
 		const placed = await placeFile(
 			{
 				stagedPath: staged,
 				relativePath,
-				tags: loudness ? { ...tags, ...replayGainTags(loudness) } : tags,
+				tags: {
+					...tags,
+					...(loudness ? replayGainTags(loudness) : {}),
+					...(lyrics ? { LYRICS: [lyrics] } : {}),
+				},
 				coverPath,
 			},
 			options,
 		);
-		const lyrics = await fetchLyrics({
-			artist: target.artists[0] ?? "",
-			title: target.title,
-			album: placement.album,
-			durationMs: target.durationMs,
-		}).catch(() => null);
 		if (lyrics) await writeLyrics(placed, lyrics).catch(() => undefined);
 		return placed;
 	};

@@ -73,4 +73,16 @@ export const libraryRouter = {
 			}
 			return { queued: true as const };
 		}),
+	lyricsBackfill: protectedProcedure
+		.input(z.object({ force: z.boolean().default(false) }))
+		.handler(async ({ input }) => {
+			try {
+				await triggerTask("lyrics.backfill", input);
+			} catch (err) {
+				if (err instanceof StartRunError)
+					throw new ORPCError("PRECONDITION_FAILED", { message: err.message });
+				throw err;
+			}
+			return { queued: true as const };
+		}),
 };

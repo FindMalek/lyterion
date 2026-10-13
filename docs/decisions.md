@@ -550,3 +550,17 @@ services stack mints the PO tokens yt-dlp needs, and the task image carries
 its yt-dlp plugin, same version. `LYTERION_YTDLP_POT_PROVIDER_URL` defaults to
 `http://bgutil-pot:4416` on `dokploy-network`. Cookies stay an optional extra
 for when YouTube tightens again.
+
+## D-050 Lyrics: a looser LRCLIB lookup, embedded in the file as well as the `.lrc` (2026-10-13)
+
+Lyrics were fetched with LRCLIB's exact `/get` (artist, title, album,
+duration), and Spotify's album names ("… (Deluxe Edition)", "… - Remastered")
+rarely match LRCLIB's, so most lookups missed silently. Now: exact `/get`,
+then `/get` without the album, then `/search` keeping only a hit with the
+same normalized title, version flags (live, remix…) and first artist, within
+2s, synced lyrics first. The result is embedded in the tags (Vorbis
+`LYRICS`, ID3 `USLT`, MP4 `©lyr`) and still written as the `.lrc` sidecar
+(D-020), so Navidrome serves them to Arpeggi and keep-player and a
+downloaded file carries them too. `lyrics.backfill` (Library → fetch
+lyrics) embeds existing sidecars and looks up the rest, one LRCLIB call a
+second.
