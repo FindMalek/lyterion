@@ -20,7 +20,7 @@ on:
 
 jobs:
   ci-infra:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, the-keep]
     timeout-minutes: 15
     steps:
       - name: Checkout
