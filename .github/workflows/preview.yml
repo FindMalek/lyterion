@@ -62,8 +62,8 @@ jobs:
             TURBO_TEAM=${{ vars.TURBO_TEAM }}
           secrets: |
             turbo_token=${{ secrets.TURBO_TOKEN }}
-          cache-from: type=gha,scope=${{ matrix.app }}
-          cache-to: type=gha,scope=${{ matrix.app }},mode=max,ignore-error=true
+          cache-from: type=registry,ref=ghcr.io/findmalek/lyterion-${{ matrix.app }}:cache
+          cache-to: type=registry,ref=ghcr.io/findmalek/lyterion-${{ matrix.app }}:cache,mode=max,ignore-error=true
 
       - name: Mark failed
         if: failure()
