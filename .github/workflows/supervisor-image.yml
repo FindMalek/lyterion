@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, the-keep]
     timeout-minutes: 15
     env:
       # Keep in step with TRIGGER_IMAGE_TAG in infra/the-keep/trigger.compose.yml and the CLI in scripts/deploy-trigger.mjs.
