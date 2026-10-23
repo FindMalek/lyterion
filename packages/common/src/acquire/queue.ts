@@ -1,7 +1,7 @@
 import { db } from "@lyterion/db";
 import { recording } from "@lyterion/db/schema/library";
 import { migrationRun } from "@lyterion/db/schema/run";
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, lt, sql } from "drizzle-orm";
 
 import type { AcquireTodo } from "./persist";
 
@@ -79,6 +79,29 @@ export async function failIfInFlight(id: string): Promise<boolean> {
 		.where(and(eq(recording.id, id), inArray(recording.status, [...IN_FLIGHT])))
 		.returning({ id: recording.id });
 	return rows.length > 0;
+}
+
+/** In-flight tracks untouched since `before` lost their task (#139); they become `missing` so the run can close. */
+export async function reapInFlight(before: Date): Promise<string[]> {
+	const rows = await db
+		.update(recording)
+		.set({ status: "missing", updatedAt: new Date() })
+		.where(
+			and(
+				inArray(recording.status, [...IN_FLIGHT]),
+				lt(recording.updatedAt, before),
+			),
+		)
+		.returning({ id: recording.id });
+	return rows.map((r) => r.id);
+}
+
+export async function waiting(): Promise<number> {
+	const [row] = await db
+		.select({ n: count() })
+		.from(recording)
+		.where(eq(recording.status, "waiting"));
+	return row?.n ?? 0;
 }
 
 export async function inFlight(): Promise<number> {

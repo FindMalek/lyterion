@@ -4,6 +4,7 @@ import { logger, schedules } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
 
 import { syncState } from "../../spotify/sync-state";
+import { reapStalledRun } from "./pipeline-watchdog";
 import { spotifyExportTask } from "./spotify-export";
 
 // D-029: daily while Spotify is still in use; new likes, saves and playlist edits flow through the same pipeline.
@@ -15,6 +16,7 @@ export const spotifySyncTask = schedules.task({
 		const state = await syncState();
 		if (!state.dailySync)
 			return { skipped: "daily sync is off since the final export" };
+		await reapStalledRun();
 		const [running] = await db
 			.select({ id: migrationRun.id })
 			.from(migrationRun)
