@@ -21,10 +21,14 @@ jobs:
   build:
     if: vars.DOKPLOY_PUBLIC_URL != '' && vars.DEPLOY_ENABLED == 'true'
     runs-on: [self-hosted, the-keep]
+    concurrency:
+      group: docker-build-lyterion-${{ matrix.app }}
+      cancel-in-progress: false
     timeout-minutes: 30
     strategy:
       matrix:
         app: [api, dashboard]
+      max-parallel: 1
     env:
       DASHBOARD_URL: https://${{ vars.PRODUCTION_DASHBOARD_HOST }}
       API_URL: https://${{ vars.PRODUCTION_API_HOST }}

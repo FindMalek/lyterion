@@ -29,10 +29,14 @@ jobs:
   build:
     if: github.event.action != 'closed' && vars.DOKPLOY_PUBLIC_URL != '' && vars.DEPLOY_ENABLED == 'true' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, the-keep]
+    concurrency:
+      group: docker-build-lyterion-${{ matrix.app }}
+      cancel-in-progress: false
     timeout-minutes: 30
     strategy:
       matrix:
         app: [api, dashboard]
+      max-parallel: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
