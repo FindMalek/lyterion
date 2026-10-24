@@ -159,6 +159,8 @@ async function ensureMounts(applicationId, mounts = []) {
 	}
 }
 
+const KEPT_ON_DEPLOY = ["LYTERION_PLAYER_TOKEN"];
+
 async function deployApp(environment, app) {
 	const application = await ensureApplication(environment, app.name);
 	const { applicationId } = application;
@@ -169,9 +171,17 @@ async function deployApp(environment, app) {
 		username: requireEnv("GHCR_USERNAME"),
 		password: requireEnv("GHCR_READ_TOKEN"),
 	});
+	// Set on the box, not in github: keep-player's token for /player/summary survives every deploy.
+	const kept = Object.fromEntries(
+		Object.entries(
+			parseEnvBlock(
+				(await query("application.one", { applicationId })).env ?? "",
+			),
+		).filter(([key]) => KEPT_ON_DEPLOY.includes(key)),
+	);
 	await dokploy("application.saveEnvironment", {
 		applicationId,
-		env: envText(app.env),
+		env: envText({ ...kept, ...app.env }),
 		buildArgs: null,
 		buildSecrets: null,
 		createEnvFile: false,
