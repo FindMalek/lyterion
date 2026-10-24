@@ -127,7 +127,12 @@ async function countAndContinue(runId: number, placed: boolean) {
 		placed ? { done: 1 } : { failed: 1 },
 	);
 	await dispatchAcquire(runId);
-	if (stageComplete(progress) && (await claimStage(runId, "finish"))) {
+	if (stageComplete(progress)) await closeRun(runId);
+}
+
+/** Exactly one caller closes the run: scans, asks Lidarr for the rest and tells the owner. */
+export async function closeRun(runId: number) {
+	if (await claimStage(runId, "finish")) {
 		await finishRun(runId, "done");
 		await navidromeScanTask.trigger({ force: true });
 		await lidarrRequestTask.trigger(undefined);
