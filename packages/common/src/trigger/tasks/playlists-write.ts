@@ -7,7 +7,9 @@ import { env } from "@lyterion/env/server";
 import { logger, task } from "@trigger.dev/sdk";
 import { sql } from "drizzle-orm";
 
+import { getCredentials } from "../../credentials/store";
 import { writePlaylist } from "../../library/playlist";
+import { syncPlaylistsToNavidrome } from "../../library/playlists-navidrome";
 import { playlistSpecs } from "../../library/playlists-persist";
 
 async function downloadCover(
@@ -80,10 +82,17 @@ export async function writeAllPlaylists() {
 	return { playlists: specs.length, changed, missing };
 }
 
-// Manual entry point (dashboard or CLI); scans call writeAllPlaylists inline.
+// Manual entry point (dashboard or CLI); scans call both steps inline.
 export const playlistsWriteTask = task({
 	id: "playlists.write",
 	queue: { name: "navidrome", concurrencyLimit: 1 },
 	maxDuration: 1800,
-	run: () => writeAllPlaylists(),
+	run: async () => {
+		const written = await writeAllPlaylists();
+		const creds = await getCredentials("navidrome");
+		return {
+			...written,
+			navidrome: creds ? await syncPlaylistsToNavidrome(creds) : null,
+		};
+	},
 });

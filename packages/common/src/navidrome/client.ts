@@ -141,6 +141,9 @@ export function createNavidromeClient(
 			);
 			return reply.playlist?.id ?? null;
 		},
+		async addToPlaylist(playlistId: string, songIds: string[]) {
+			await call("updatePlaylist", { playlistId, songIdToAdd: songIds });
+		},
 		async removeFromPlaylist(playlistId: string, indexes: number[]) {
 			await call("updatePlaylist", {
 				playlistId,

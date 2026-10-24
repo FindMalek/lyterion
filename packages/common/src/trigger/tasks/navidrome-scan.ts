@@ -2,6 +2,7 @@ import { env } from "@lyterion/env/server";
 import { idempotencyKeys, logger, task } from "@trigger.dev/sdk";
 
 import { getCredentials } from "../../credentials/store";
+import { syncPlaylistsToNavidrome } from "../../library/playlists-navidrome";
 import { createNavidromeClient } from "../../navidrome/client";
 import {
 	linkByPath,
@@ -60,6 +61,16 @@ export const navidromeScanTask = task({
 		// Navidrome imports m3u files on scan, so changed playlists count as pending for the next one.
 		const playlists = await writeAllPlaylists();
 		if (playlists.changed > 0) await requestScan(playlists.changed);
+		// Editable in Navidrome from here on: convert imported ones, then only add what Spotify gained.
+		const editable = await syncPlaylistsToNavidrome(creds).catch(
+			(error: unknown) => {
+				logger.warn("playlist sync to navidrome failed", {
+					error: String(error),
+				});
+				return null;
+			},
+		);
+		if (editable) logger.info("playlists synced to navidrome", editable);
 		return { scanned: state.pending, linked, unlinked: files.length - linked };
 	},
 });

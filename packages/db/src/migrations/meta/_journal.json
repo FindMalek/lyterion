@@ -78,6 +78,13 @@
 			"when": 1791823699141,
 			"tag": "0010_classy_black_queen",
 			"breakpoints": true
+		},
+		{
+			"idx": 11,
+			"version": "7",
+			"when": 1792836633232,
+			"tag": "0011_illegal_riptide",
+			"breakpoints": true
 		}
 	]
 }
