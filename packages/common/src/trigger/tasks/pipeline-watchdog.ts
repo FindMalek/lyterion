@@ -1,6 +1,6 @@
 import { db } from "@lyterion/db";
 import { migrationRun } from "@lyterion/db/schema/run";
-import { logger, schedules } from "@trigger.dev/sdk";
+import { logger, queues, schedules } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
 
 import { dispatchAcquire } from "../../acquire/dispatch";
@@ -17,6 +17,12 @@ export async function reapStalledRun(now = new Date()) {
 		.where(eq(migrationRun.status, "running"))
 		.limit(1);
 	if (!run) return null;
+	// A paused queue holds claimed tracks on purpose: they aren't lost, so nothing to reap until it resumes.
+	const queue = await queues
+		.retrieve({ type: "custom", name: "acquire" })
+		.catch(() => null);
+	if (queue?.paused)
+		return { runId: run.id, reaped: 0, closed: false, paused: true };
 	const reaped = await reapInFlight(new Date(now.getTime() - STALL_MS));
 	for (const _ of reaped)
 		await incrementStage(run.id, ACQUIRE_STAGE, { failed: 1 });
