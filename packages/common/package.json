@@ -23,6 +23,9 @@
 		"./dashboard": {
 			"default": "./src/dashboard/queries.ts"
 		},
+		"./library/player-summary": {
+			"default": "./src/library/player-summary.ts"
+		},
 		"./reconcile": {
 			"default": "./src/reconcile/plan.ts"
 		},

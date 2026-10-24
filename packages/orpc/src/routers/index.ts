@@ -4,6 +4,7 @@ import { protectedProcedure, publicProcedure } from "../procedures";
 import { connectionsRouter } from "./connections";
 import { libraryRouter } from "./library";
 import { onboardingRouter } from "./onboarding";
+import { playerRouter } from "./player";
 import { reviewRouter } from "./review";
 import { runsRouter } from "./runs";
 
@@ -13,6 +14,7 @@ export const appRouter = {
 	runs: runsRouter,
 	review: reviewRouter,
 	library: libraryRouter,
+	player: playerRouter,
 	health: publicProcedure.handler(() => ({ ok: true as const })),
 	me: protectedProcedure.handler(({ context }) => ({
 		id: context.session.user.id,
