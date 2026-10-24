@@ -1,0 +1,1 @@
+ALTER TABLE "playlist_write" ADD COLUMN "pushed_ids" jsonb;

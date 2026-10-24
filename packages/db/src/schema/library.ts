@@ -3,6 +3,7 @@ import {
 	doublePrecision,
 	index,
 	integer,
+	jsonb,
 	pgTable,
 	primaryKey,
 	serial,
@@ -214,6 +215,8 @@ export const playlistWrite = pgTable("playlist_write", {
 	missing: integer("missing").notNull(),
 	writtenAt: timestamp("written_at").notNull(),
 	checkedAt: timestamp("checked_at").defaultNow().notNull(),
+	// Navidrome song ids Lyterion has put in the editable playlist; anything else in there is the owner's own edit.
+	pushedIds: jsonb("pushed_ids").$type<string[]>(),
 });
 
 export const providerHealth = pgTable(
