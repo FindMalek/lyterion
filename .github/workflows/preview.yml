@@ -85,7 +85,7 @@ jobs:
       - name: Deploy preview
         env:
           GHCR_USERNAME: ${{ github.actor }}
-          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN || github.token }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
           PREVIEW_APP_ENV: |
             LYTERION_BETTER_AUTH_SECRET=${{ secrets.LYTERION_BETTER_AUTH_SECRET }}
             LYTERION_SPOTIFY_CLIENT_ID=${{ secrets.LYTERION_SPOTIFY_CLIENT_ID }}
