@@ -36,6 +36,27 @@ export async function triggerTask(
 	}
 }
 
+/** Many runs of one task in as few calls as Trigger.dev allows (500 a batch). */
+export async function triggerTasks(
+	id: string,
+	payloads: unknown[],
+	options?: { priority?: number },
+): Promise<void> {
+	configureTrigger();
+	for (let i = 0; i < payloads.length; i += 500) {
+		try {
+			await tasks.batchTrigger(
+				id,
+				payloads.slice(i, i + 500).map((payload) => ({ payload, options })),
+			);
+		} catch (err) {
+			throw new StartRunError(
+				`Trigger.dev refused ${id}: ${err instanceof Error ? err.message : String(err)}`,
+			);
+		}
+	}
+}
+
 // Every task a migration run fans into; a new run cancels whatever of these an older run left alive.
 export const PIPELINE_TASKS = [
 	"spotify.export",

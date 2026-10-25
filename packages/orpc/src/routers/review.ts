@@ -1,4 +1,8 @@
-import { StartRunError, triggerTask } from "@lyterion/common/pipeline/start";
+import {
+	StartRunError,
+	triggerTask,
+	triggerTasks,
+} from "@lyterion/common/pipeline/start";
 import {
 	bestCandidate,
 	markPickFailed,
@@ -56,34 +60,33 @@ export const reviewRouter = {
 		}),
 	/** The best candidate for each of these reviews, queued like a single pick; answers how many went and which didn't. */
 	pickMany: protectedProcedure
-		.input(z.object({ reviewIds: z.array(z.number().int()).min(1).max(1000) }))
+		.input(z.object({ reviewIds: z.array(z.number().int()).min(1).max(500) }))
 		.handler(async ({ input }) => {
 			const wanted = new Set(input.reviewIds);
 			const items = (await openReviews()).filter((item) => wanted.has(item.id));
-			let queued = 0;
+			const claimed: { reviewId: number; candidateId: number }[] = [];
 			const failed: number[] = [];
-			for (const item of items) {
-				const best = bestCandidate(item.candidates, item.durationMs);
-				if (!best || !(await markPicking(item.id, best.id))) {
-					failed.push(item.id);
-					continue;
-				}
+			// Claimed 25 at a time: each is two small queries, and a long sequential loop would outlast the request.
+			for (let i = 0; i < items.length; i += 25)
+				await Promise.all(
+					items.slice(i, i + 25).map(async (item) => {
+						const best = bestCandidate(item.candidates, item.durationMs);
+						if (best && (await markPicking(item.id, best.id)))
+							claimed.push({ reviewId: item.id, candidateId: best.id });
+						else failed.push(item.id);
+					}),
+				);
+			if (claimed.length)
 				try {
-					await triggerTask(
-						"review.resolve",
-						{ reviewId: item.id, candidateId: best.id },
-						{ priority: 3600 },
-					);
-					queued++;
+					await triggerTasks("review.resolve", claimed, { priority: 3600 });
 				} catch (err) {
-					await markPickFailed(
-						item.id,
-						err instanceof Error ? err.message : String(err),
+					const reason = err instanceof Error ? err.message : String(err);
+					await Promise.all(
+						claimed.map((pick) => markPickFailed(pick.reviewId, reason)),
 					);
-					failed.push(item.id);
+					throw new ORPCError("PRECONDITION_FAILED", { message: reason });
 				}
-			}
-			return { queued, failed };
+			return { queued: claimed.length, failed };
 		}),
 	skip: protectedProcedure
 		.input(z.object({ reviewId: z.number().int() }))
