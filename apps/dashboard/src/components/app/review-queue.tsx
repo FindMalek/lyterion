@@ -29,7 +29,7 @@ import {
 } from "@/components/shared/audio-player";
 import { EmptyState } from "@/components/shared/empty-state";
 import { env } from "@/lib/env";
-import { orpc } from "@/shared/api/orpc";
+import { client, orpc } from "@/shared/api/orpc";
 
 type Item = Awaited<ReturnType<AppRouterClient["review"]["list"]>>[number];
 type Candidate = Item["candidates"][number];
@@ -127,6 +127,7 @@ export function ReviewQueue() {
 
 	// Tracks ticked for a bulk pick.
 	const [chosen, setChosen] = useState<Set<number>>(() => new Set());
+	const lastTicked = useRef<number | null>(null);
 
 	// Picks and skips leave the list at once and run behind; a failure refetches, which brings the track back.
 	const drop = (ids: number[]) => {
@@ -152,26 +153,43 @@ export function ReviewQueue() {
 			refresh();
 		},
 	});
-	const pickMany = useMutation({
-		...orpc.review.pickMany.mutationOptions(),
-		onMutate: (vars) => drop(vars.reviewIds),
-		onSuccess: (result) => {
-			toast.success(`Picked the best file for ${result.queued}`, {
-				description: result.failed.length
-					? `${result.failed.length} couldn't be picked and stay in the queue.`
-					: "Placing them in the background.",
-			});
-			if (result.failed.length) refresh();
-			else
-				void queryClient.invalidateQueries({
-					queryKey: orpc.review.count.key(),
+	// The selection goes 500 at a time (what one call takes), with one toast counting up.
+	const [bulk, setBulk] = useState(false);
+	async function pickSelected() {
+		const ids = items.filter((it) => chosen.has(it.id)).map((it) => it.id);
+		if (!ids.length || bulk) return;
+		setBulk(true);
+		drop(ids);
+		const toastId = toast.loading(`Picking the best file for ${ids.length}…`);
+		let queued = 0;
+		let failed = 0;
+		for (let i = 0; i < ids.length; i += 500) {
+			try {
+				const result = await client.review.pickMany({
+					reviewIds: ids.slice(i, i + 500),
 				});
-		},
-		onError: (err) => {
-			toast.error("Couldn't pick them", { description: err.message });
-			refresh();
-		},
-	});
+				queued += result.queued;
+				failed += result.failed.length;
+			} catch (err) {
+				failed += Math.min(500, ids.length - i);
+				toast.error("Some couldn't be picked", {
+					description: err instanceof Error ? err.message : String(err),
+				});
+			}
+			toast.loading(
+				`Picking the best file… ${Math.min(i + 500, ids.length)} of ${ids.length}`,
+				{ id: toastId },
+			);
+		}
+		toast.success(`${queued} picked, placing them in the background`, {
+			id: toastId,
+			description: failed
+				? `${failed} couldn't be picked and stay in the queue.`
+				: undefined,
+		});
+		setBulk(false);
+		refresh();
+	}
 	const skip = useMutation({
 		...orpc.review.skip.mutationOptions(),
 		onMutate: (vars) => drop([vars.reviewId]),
@@ -250,7 +268,7 @@ export function ReviewQueue() {
 				aria-label="tracks to review"
 				className="max-h-56 overflow-y-auto border-b md:max-h-none md:border-r md:border-b-0"
 			>
-				<div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background px-4 py-2 text-[12px]">
+				<div className="sticky top-0 z-10 flex h-11 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
 					<Checkbox
 						aria-label={
 							chosen.size === items.length ? "Select none" : "Select all"
@@ -270,25 +288,67 @@ export function ReviewQueue() {
 							)
 						}
 					/>
-					<span className="flex-1 font-mono text-muted-foreground">
-						{chosen.size ? `${chosen.size} selected` : `${items.length} tracks`}
-					</span>
-					{chosen.size > 0 && (
-						<Button
-							size="xs"
-							onClick={() => pickMany.mutate({ reviewIds: [...chosen] })}
-						>
-							Pick the best
-						</Button>
+					{chosen.size === 0 ? (
+						<span className="flex-1 text-muted-foreground text-xs">
+							Select all {items.length}
+						</span>
+					) : (
+						<>
+							<span className="flex-1 font-mono text-xs tabular-nums">
+								{chosen.size} selected
+							</span>
+							<Button
+								size="xs"
+								variant="ghost"
+								onClick={() => setChosen(new Set())}
+							>
+								Clear
+							</Button>
+							<Button
+								size="xs"
+								disabled={bulk}
+								onClick={() => void pickSelected()}
+							>
+								Pick the best
+							</Button>
+						</>
 					)}
 				</div>
 				<ol>
 					{items.map((it, i) => (
-						<li key={it.id} className="flex items-stretch">
-							<span className="flex items-center border-b pl-4">
+						<li
+							key={it.id}
+							className={cn(
+								"flex items-stretch border-b",
+								chosen.has(it.id) && "bg-muted/40",
+							)}
+							// Thousands of rows: the browser skips laying out the ones off screen.
+							style={{
+								contentVisibility: "auto",
+								containIntrinsicSize: "auto 56px",
+							}}
+						>
+							<span className="flex items-center pr-1 pl-4">
 								<Checkbox
 									aria-label={`Select ${it.title}`}
 									checked={chosen.has(it.id)}
+									onClick={(event) => {
+										// Shift-click ticks or unticks everything between the last one and this one.
+										const from = lastTicked.current;
+										lastTicked.current = i;
+										if (!event.shiftKey || from === null) return;
+										event.preventDefault();
+										const range = items
+											.slice(Math.min(from, i), Math.max(from, i) + 1)
+											.map((row) => row.id);
+										const on = !chosen.has(it.id);
+										setChosen((current) => {
+											const next = new Set(current);
+											for (const id of range)
+												on ? next.add(id) : next.delete(id);
+											return next;
+										});
+									}}
 									onCheckedChange={(checked) =>
 										setChosen((current) => {
 											const next = new Set(current);
@@ -307,7 +367,7 @@ export function ReviewQueue() {
 								}}
 								aria-current={it.id === item.id ? "true" : undefined}
 								className={cn(
-									"relative flex w-full min-w-0 flex-col items-start gap-0.5 border-b px-3 py-2.5 text-left text-[13px] transition-colors hover:bg-muted/60",
+									"relative flex w-full min-w-0 flex-col items-start gap-0.5 px-3 py-2.5 text-left text-[13px] transition-colors hover:bg-muted/60",
 									"aria-[current=true]:bg-muted aria-[current=true]:before:absolute aria-[current=true]:before:inset-y-0 aria-[current=true]:before:left-0 aria-[current=true]:before:w-0.5 aria-[current=true]:before:bg-foreground",
 								)}
 							>
