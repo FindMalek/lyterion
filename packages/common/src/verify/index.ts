@@ -34,6 +34,8 @@ export type VerifyExpectation = {
 	durationMs: number;
 	mbRecordingIds: string[];
 	candidate: Candidate;
+	/** The owner picked this file in review: it still has to decode and be the right length, but no fingerprint can overrule them. */
+	ownerPick?: boolean;
 };
 
 export type VerifyResult =
@@ -81,7 +83,11 @@ export async function verifyFile(
 	}
 
 	// YouTube returns covers and live takes for studio queries, so its files must be fingerprinted (#38).
-	if (expect.candidate.providerId === "youtube" && !deps.lookupFingerprint)
+	if (
+		expect.candidate.providerId === "youtube" &&
+		!deps.lookupFingerprint &&
+		!expect.ownerPick
+	)
 		return { ok: false, reason: "no_fingerprint", facts };
 
 	let fp: Fingerprint | null = null;
@@ -93,9 +99,10 @@ export async function verifyFile(
 			expect.mbRecordingIds,
 		);
 	}
-	if (verdict === "mismatch")
+	if (verdict === "mismatch" && !expect.ownerPick)
 		return { ok: false, reason: "wrong_recording", facts };
 	if (
+		!expect.ownerPick &&
 		verdict === "unknown" &&
 		expect.candidate.matchConfidence < UNVERIFIED_MIN_CONFIDENCE
 	) {

@@ -86,6 +86,7 @@ async function resolvePick({ reviewId, candidateId }: ReviewPickPayload) {
 		durationMs: job.target.durationMs,
 		mbRecordingIds: [],
 		candidate: picked,
+		ownerPick: true,
 	});
 	if (!verify.ok)
 		throw new Error(`picked file failed verification: ${verify.reason}`);
