@@ -128,8 +128,7 @@ export function ReviewQueue() {
 	// Tracks ticked for a bulk pick.
 	const [chosen, setChosen] = useState<Set<number>>(() => new Set());
 
-	// A pick or skip takes the track out of the list at once (the same index is then the next track) and runs in the
-	// background; a failure refetches, which brings the track back with the reason.
+	// Picks and skips leave the list at once and run behind; a failure refetches, which brings the track back.
 	const drop = (ids: number[]) => {
 		setCandidateIndex(0);
 		queryClient.setQueryData(orpc.review.list.queryKey(), (old) =>
