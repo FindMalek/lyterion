@@ -1,5 +1,6 @@
 import { StartRunError, triggerTask } from "@lyterion/common/pipeline/start";
 import {
+	bestCandidate,
 	markPickFailed,
 	markPicking,
 	openReviewCount,
@@ -52,6 +53,37 @@ export const reviewRouter = {
 				throw err;
 			}
 			return { queued: true as const };
+		}),
+	/** The best candidate for each of these reviews, queued like a single pick; answers how many went and which didn't. */
+	pickMany: protectedProcedure
+		.input(z.object({ reviewIds: z.array(z.number().int()).min(1).max(1000) }))
+		.handler(async ({ input }) => {
+			const wanted = new Set(input.reviewIds);
+			const items = (await openReviews()).filter((item) => wanted.has(item.id));
+			let queued = 0;
+			const failed: number[] = [];
+			for (const item of items) {
+				const best = bestCandidate(item.candidates, item.durationMs);
+				if (!best || !(await markPicking(item.id, best.id))) {
+					failed.push(item.id);
+					continue;
+				}
+				try {
+					await triggerTask(
+						"review.resolve",
+						{ reviewId: item.id, candidateId: best.id },
+						{ priority: 3600 },
+					);
+					queued++;
+				} catch (err) {
+					await markPickFailed(
+						item.id,
+						err instanceof Error ? err.message : String(err),
+					);
+					failed.push(item.id);
+				}
+			}
+			return { queued, failed };
 		}),
 	skip: protectedProcedure
 		.input(z.object({ reviewId: z.number().int() }))

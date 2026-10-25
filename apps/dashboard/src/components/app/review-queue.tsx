@@ -7,6 +7,7 @@ import {
 	AlertTitle,
 	Badge,
 	Button,
+	Checkbox,
 	cn,
 	Icons,
 	Kbd,
@@ -124,39 +125,63 @@ export function ReviewQueue() {
 	const selected = candidates[Math.min(candidateIndex, candidates.length - 1)];
 	const player = useRef<AudioPlayerHandle>(null);
 
-	// The resolved item drops out of the list, so the same index is already the next track.
-	const settle = () => {
+	// Tracks ticked for a bulk pick.
+	const [chosen, setChosen] = useState<Set<number>>(() => new Set());
+
+	// Picks and skips leave the list at once and run behind; a failure refetches, which brings the track back.
+	const drop = (ids: number[]) => {
 		setCandidateIndex(0);
-		return Promise.all([
-			queryClient.invalidateQueries({ queryKey: orpc.review.list.key() }),
-			queryClient.invalidateQueries({ queryKey: orpc.review.count.key() }),
-		]);
+		queryClient.setQueryData(orpc.review.list.queryKey(), (old) =>
+			old?.filter((i) => !ids.includes(i.id)),
+		);
+		setChosen(
+			(current) => new Set([...current].filter((id) => !ids.includes(id))),
+		);
+	};
+	const refresh = () => {
+		void queryClient.invalidateQueries({ queryKey: orpc.review.list.key() });
+		void queryClient.invalidateQueries({ queryKey: orpc.review.count.key() });
 	};
 	const pick = useMutation({
 		...orpc.review.pick.mutationOptions(),
-		onSuccess: (_r, vars) => {
-			// Gone from the list at once; the refetch confirms, and a failed placement brings it back with the reason.
-			queryClient.setQueryData(orpc.review.list.queryKey(), (old) =>
-				old?.filter((i) => i.id !== vars.reviewId),
-			);
-			toast.success("Picked", {
-				description: `${item?.title}: placing it in the background.`,
-			});
-			return settle();
+		onMutate: (vars) => drop([vars.reviewId]),
+		onSuccess: () =>
+			void queryClient.invalidateQueries({ queryKey: orpc.review.count.key() }),
+		onError: (err) => {
+			toast.error("Couldn't pick", { description: err.message });
+			refresh();
 		},
-		onError: (err) =>
-			toast.error("Couldn't pick", { description: err.message }),
+	});
+	const pickMany = useMutation({
+		...orpc.review.pickMany.mutationOptions(),
+		onMutate: (vars) => drop(vars.reviewIds),
+		onSuccess: (result) => {
+			toast.success(`Picked the best file for ${result.queued}`, {
+				description: result.failed.length
+					? `${result.failed.length} couldn't be picked and stay in the queue.`
+					: "Placing them in the background.",
+			});
+			if (result.failed.length) refresh();
+			else
+				void queryClient.invalidateQueries({
+					queryKey: orpc.review.count.key(),
+				});
+		},
+		onError: (err) => {
+			toast.error("Couldn't pick them", { description: err.message });
+			refresh();
+		},
 	});
 	const skip = useMutation({
 		...orpc.review.skip.mutationOptions(),
-		onSuccess: () => {
-			toast(`Skipped ${item?.title}`);
-			return settle();
+		onMutate: (vars) => drop([vars.reviewId]),
+		onSuccess: () =>
+			void queryClient.invalidateQueries({ queryKey: orpc.review.count.key() }),
+		onError: (err) => {
+			toast.error("Couldn't skip", { description: err.message });
+			refresh();
 		},
-		onError: (err) =>
-			toast.error("Couldn't skip", { description: err.message }),
 	});
-	const busy = pick.isPending || skip.isPending;
 
 	useEffect(() => {
 		function onKey(e: KeyboardEvent) {
@@ -184,16 +209,16 @@ export function ReviewQueue() {
 			} else if (e.key === "p") {
 				setItemIndex((i) => Math.max(i - 1, 0));
 				setCandidateIndex(0);
-			} else if (e.key === "Enter" && selected && !busy)
+			} else if (e.key === "Enter" && selected)
 				pick.mutate({ reviewId: item.id, candidateId: selected.id });
-			else if (e.key === "s" && !busy) skip.mutate({ reviewId: item.id });
+			else if (e.key === "s") skip.mutate({ reviewId: item.id });
 			else if (e.key === " ") player.current?.toggle();
 			else return;
 			e.preventDefault();
 		}
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [item, items.length, candidates.length, selected, busy, pick, skip]);
+	}, [item, items.length, candidates.length, selected, pick, skip]);
 
 	if (!data)
 		return (
@@ -225,9 +250,55 @@ export function ReviewQueue() {
 				aria-label="tracks to review"
 				className="max-h-56 overflow-y-auto border-b md:max-h-none md:border-r md:border-b-0"
 			>
+				<div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background px-4 py-2 text-[12px]">
+					<Checkbox
+						aria-label={
+							chosen.size === items.length ? "Select none" : "Select all"
+						}
+						checked={
+							chosen.size === 0
+								? false
+								: chosen.size === items.length
+									? true
+									: "indeterminate"
+						}
+						onCheckedChange={() =>
+							setChosen(
+								chosen.size === items.length
+									? new Set()
+									: new Set(items.map((it) => it.id)),
+							)
+						}
+					/>
+					<span className="flex-1 font-mono text-muted-foreground">
+						{chosen.size ? `${chosen.size} selected` : `${items.length} tracks`}
+					</span>
+					{chosen.size > 0 && (
+						<Button
+							size="xs"
+							onClick={() => pickMany.mutate({ reviewIds: [...chosen] })}
+						>
+							Pick the best
+						</Button>
+					)}
+				</div>
 				<ol>
 					{items.map((it, i) => (
-						<li key={it.id}>
+						<li key={it.id} className="flex items-stretch">
+							<span className="flex items-center border-b pl-4">
+								<Checkbox
+									aria-label={`Select ${it.title}`}
+									checked={chosen.has(it.id)}
+									onCheckedChange={(checked) =>
+										setChosen((current) => {
+											const next = new Set(current);
+											if (checked === true) next.add(it.id);
+											else next.delete(it.id);
+											return next;
+										})
+									}
+								/>
+							</span>
 							<button
 								type="button"
 								onClick={() => {
@@ -236,7 +307,7 @@ export function ReviewQueue() {
 								}}
 								aria-current={it.id === item.id ? "true" : undefined}
 								className={cn(
-									"relative flex w-full flex-col items-start gap-0.5 border-b px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-muted/60",
+									"relative flex w-full min-w-0 flex-col items-start gap-0.5 border-b px-3 py-2.5 text-left text-[13px] transition-colors hover:bg-muted/60",
 									"aria-[current=true]:bg-muted aria-[current=true]:before:absolute aria-[current=true]:before:inset-y-0 aria-[current=true]:before:left-0 aria-[current=true]:before:w-0.5 aria-[current=true]:before:bg-foreground",
 								)}
 							>
@@ -398,16 +469,13 @@ export function ReviewQueue() {
 					<div className="flex items-center gap-2 sm:ml-auto">
 						<Button
 							variant="outline"
-							disabled={busy}
-							isLoading={skip.isPending}
 							onClick={() => skip.mutate({ reviewId: item.id })}
 						>
 							Skip track
 							<Kbd>S</Kbd>
 						</Button>
 						<Button
-							disabled={!selected || busy}
-							isLoading={pick.isPending}
+							disabled={!selected}
 							onClick={() =>
 								selected &&
 								pick.mutate({ reviewId: item.id, candidateId: selected.id })

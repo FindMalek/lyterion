@@ -11,6 +11,7 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
 import { candidateLabel, candidateSource, pickState } from "./source";
 
+export { bestCandidate } from "./best";
 export { candidateLabel, candidateSource, pickState };
 
 /** Claims an open item for a pick; false when it's already resolved or being placed. */
