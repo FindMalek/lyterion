@@ -92,6 +92,25 @@ describe.skipIf(!hasFfmpeg)("verifyFile", () => {
 		expect(result).toMatchObject({ ok: false, reason: "no_fingerprint" });
 	});
 
+	it("takes a YouTube file the owner picked in review, marked as an unverified match", async () => {
+		const result = await verifyFile(noise("yt-picked.flac"), {
+			durationMs: 12_000,
+			mbRecordingIds: [],
+			candidate: {
+				...flac,
+				providerId: "youtube",
+				format: "opus",
+				isrcMatch: false,
+				matchConfidence: 0.6,
+			},
+			ownerPick: true,
+		});
+		expect(result).toMatchObject({
+			ok: true,
+			upgradeReason: "unverified_match",
+		});
+	});
+
 	it("rejects a file whose length is off by more than the tolerance", async () => {
 		const result = await verifyFile(noise("short.flac"), {
 			durationMs: 200_000,

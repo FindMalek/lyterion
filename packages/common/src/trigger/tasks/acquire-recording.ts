@@ -38,8 +38,8 @@ const PAUSE_DELAY = "10m";
 
 export type AcquirePayload = { runId: number; recordingId: string };
 
-// Shared by every task that downloads and verifies (acquire, release, review, upgrade); sized for the-keep's 6 cores (#118).
-export const ACQUIRE_CONCURRENCY = 8;
+// Shared by every task that downloads and verifies (acquire, release, review, upgrade): half of the-keep's 6 cores, so the rest stays responsive (#157).
+export const ACQUIRE_CONCURRENCY = 4;
 export const acquireQueue: ReturnType<typeof queue> = queue({
 	name: "acquire",
 	concurrencyLimit: ACQUIRE_CONCURRENCY,
