@@ -6,7 +6,7 @@ import { resolveWish, type WishMeta } from "../../wishlist/resolve";
 // The api image has no yt-dlp, python, cookies or PO-token server; the task image has all of them.
 export const wishlistResolveTask = task({
 	id: "wishlist.resolve",
-	maxDuration: 120,
+	maxDuration: 60,
 	retry: { maxAttempts: 1 },
 	run: (payload: { input: string }): Promise<WishMeta> =>
 		resolveWish(payload.input, {

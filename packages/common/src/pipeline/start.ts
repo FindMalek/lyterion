@@ -1,7 +1,15 @@
 import { db } from "@lyterion/db";
 import { migrationRun } from "@lyterion/db/schema/run";
 import { env } from "@lyterion/env/server";
-import { configure, runs, tasks } from "@trigger.dev/sdk";
+import {
+	type AnyTask,
+	configure,
+	runs,
+	type TaskIdentifier,
+	type TaskOutput,
+	type TaskPayload,
+	tasks,
+} from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
 
 import type { ExportMode } from "../spotify/sync-state";
@@ -36,26 +44,26 @@ export async function triggerTask(
 	}
 }
 
-/** Triggers a task and waits for its output, for the short lookups the player waits on. */
-export async function runTask<T>(
-	id: string,
-	payload: unknown,
+const RUN_POLL_MS = 500;
+
+/** Triggers a task and waits for its output, for the short lookups the player waits on. Stops waiting at the deadline. */
+export async function runTask<TTask extends AnyTask>(
+	id: TaskIdentifier<TTask>,
+	payload: TaskPayload<TTask>,
 	timeoutMs = 90_000,
-): Promise<T> {
+): Promise<TaskOutput<TTask>> {
 	configureTrigger();
+	const deadline = Date.now() + timeoutMs;
 	try {
-		const handle = await tasks.trigger(id, payload);
-		const run = await Promise.race([
-			runs.poll(handle.id, { pollIntervalMs: 500 }),
-			new Promise<never>((_, reject) =>
-				setTimeout(
-					() => reject(new Error(`${id} took too long, try again`)),
-					timeoutMs,
-				),
-			),
-		]);
-		if (run.isSuccess) return run.output as T;
-		throw new Error(run.error?.message ?? `${id} failed`);
+		const handle = await tasks.trigger<TTask>(id, payload);
+		while (Date.now() < deadline) {
+			const run = await runs.retrieve(handle.id);
+			if (run.isSuccess) return run.output as TaskOutput<TTask>;
+			if (run.isCompleted)
+				throw new Error(run.error?.message ?? `${id} failed`);
+			await new Promise((resolve) => setTimeout(resolve, RUN_POLL_MS));
+		}
+		throw new Error(`${id} took too long, try again`);
 	} catch (err) {
 		throw new StartRunError(
 			err instanceof Error ? err.message : `Trigger.dev refused ${id}`,

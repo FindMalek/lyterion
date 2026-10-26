@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 
 import { runTask, StartRunError, triggerTask } from "../pipeline/start";
 import type { AcquirePayload } from "../trigger/tasks/acquire-recording";
+import type { wishlistResolveTask } from "../trigger/tasks/wishlist-resolve";
 import {
 	CUSTOM_LINK_PREFIX,
 	CUSTOM_TRACK_PREFIX,
@@ -18,7 +19,9 @@ import { resolveWish, type WishMeta } from "./resolve";
 export async function resolveWishInTask(input: string): Promise<WishMeta> {
 	const text = input.trim();
 	if (/deezer\.com|dzr\.page\.link/i.test(text)) return resolveWish(text);
-	return runTask<WishMeta>("wishlist.resolve", { input: text });
+	return runTask<typeof wishlistResolveTask>("wishlist.resolve", {
+		input: text,
+	});
 }
 
 export type WishDeps = {
