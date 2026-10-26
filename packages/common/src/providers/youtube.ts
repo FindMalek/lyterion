@@ -167,6 +167,15 @@ const MIN_NAME_SCORE = 0.6;
 const UPLOAD_NOISE =
 	/\s*[([](?:official|audio|video|lyrics?|visuali[sz]er|prod\b|hd|hq)[^)\]]*[)\]]/gi;
 
+/** "Artist - Title (Official Video)" as an upload names it: the title cleaned, the artist when the title carries one. */
+export function parseUpload(raw: string): { title: string; artist?: string } {
+	const title = raw.replace(UPLOAD_NOISE, "").trim();
+	const split = title.match(/^(.+?)\s+-\s+(.+)$/);
+	return split?.[1] && split[2]
+		? { title: split[2], artist: split[1] }
+		: { title };
+}
+
 function nameScore(query: string, entry: YtEntry): number {
 	const wanted = normalizeText(query).split(" ").filter(Boolean);
 	const found = new Set(
@@ -290,6 +299,7 @@ export function createYoutubeProvider(options: YoutubeOptions = {}): Provider {
 			await options.pace?.();
 			// Opus stays opus (no re-encode); anything else is extracted as the best audio available.
 			await run([
+				"--no-playlist",
 				"-f",
 				"bestaudio[acodec=opus]/bestaudio",
 				"-x",
