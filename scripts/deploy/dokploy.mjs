@@ -60,7 +60,14 @@ async function ensureEnvironment(projectName) {
 	}
 	const environment = project?.environments?.[0];
 	if (!environment) throw new Error(`no environment in project ${projectName}`);
-	return { project, environment };
+	// The environment row has no projectId of its own; the dashboard links need it.
+	return {
+		project,
+		environment: {
+			...environment,
+			projectId: environment.projectId ?? project.projectId,
+		},
+	};
 }
 
 // project.all hides postgres services the api key wasn't granted, so the id lives in the api app's env (D-037).
