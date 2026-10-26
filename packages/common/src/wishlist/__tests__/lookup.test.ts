@@ -42,7 +42,12 @@ describe("youtube lookup", () => {
 				artists: ["Massive Attack"],
 				duration: 330,
 			})("teardrop"),
-		).toMatchObject({ title: "Teardrop", artists: ["Massive Attack"] });
+		).toMatchObject({
+			title: "Teardrop",
+			artists: ["Massive Attack"],
+			// A typed name pins the video the lookup picked.
+			linkUrl: "https://www.youtube.com/watch?v=b",
+		});
 	});
 });
 

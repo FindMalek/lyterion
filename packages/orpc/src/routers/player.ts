@@ -7,16 +7,23 @@ import { env } from "@lyterion/env/server";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
-import { publicProcedure } from "../procedures";
+import { o } from "../procedures";
+import { rateLimiters } from "../utils/rate-limiter";
 
 /** keep-player's own token (LYTERION_PLAYER_TOKEN), not a dashboard session: it calls server to server. */
-const playerProcedure = publicProcedure.use(({ context, next }) => {
+const playerProcedure = o.use(({ context, next }) => {
 	const expected = env.LYTERION_PLAYER_TOKEN;
 	if (!expected) throw new ORPCError("NOT_FOUND");
 	const given = Buffer.from(context.headers.get("x-lyterion-token") ?? "");
 	const want = Buffer.from(expected);
-	if (given.length !== want.length || !timingSafeEqual(given, want))
+	if (given.length !== want.length || !timingSafeEqual(given, want)) {
+		// A valid token is never throttled (the player polls); guessing one is.
+		const guess = rateLimiters.strict.check(
+			rateLimiters.strict.getIdentifier(context.headers, undefined),
+		);
+		if (!guess.success) throw new ORPCError("TOO_MANY_REQUESTS");
 		throw new ORPCError("UNAUTHORIZED");
+	}
 	return next();
 });
 
