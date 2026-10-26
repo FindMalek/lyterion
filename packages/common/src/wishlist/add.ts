@@ -5,31 +5,37 @@ import { recording } from "@lyterion/db/schema/library";
 import { migrationRun } from "@lyterion/db/schema/run";
 import { eq } from "drizzle-orm";
 
-import { runTask, StartRunError, triggerTask } from "../pipeline/start";
-import type { AcquirePayload } from "../trigger/tasks/acquire-recording";
-import type { wishlistResolveTask } from "../trigger/tasks/wishlist-resolve";
+import { StartRunError, triggerTask } from "../pipeline/start";
 import {
 	CUSTOM_LINK_PREFIX,
 	CUSTOM_TRACK_PREFIX,
 	WISHLIST_RUN_KIND,
 } from "./custom";
-import { resolveWish, type WishMeta } from "./resolve";
+import { quickWish, type WishMeta } from "./resolve";
 
-/** For the api, which has no yt-dlp: the lookup runs in the task image, where the cookies and PO-token server are. */
-export async function resolveWishInTask(input: string): Promise<WishMeta> {
-	const text = input.trim();
-	if (/deezer\.com|dzr\.page\.link/i.test(text)) return resolveWish(text);
-	return runTask<typeof wishlistResolveTask>("wishlist.resolve", {
-		input: text,
-	});
-}
+export type WishPayload = { runId: number; recordingId: string };
+export type WishAddPayload = WishPayload & { input: string };
 
 export type WishDeps = {
-	lookup?: (input: string) => Promise<WishMeta>;
-	trigger?: (id: string, payload: AcquirePayload) => Promise<void>;
+	quick?: (input: string) => Promise<WishMeta>;
+	trigger?: (
+		id: string,
+		payload: WishAddPayload | WishPayload,
+	) => Promise<void>;
 };
 
-/** A link or a name becomes one recording in its own one-track run, then goes through the normal acquire ladder. */
+/** The id the recording keeps in place of a Spotify track; a pasted link rides along so the youtube provider offers exactly it. */
+export function customTrackId(meta: WishMeta, id: string): string {
+	return meta.linkUrl
+		? `${CUSTOM_LINK_PREFIX}${meta.linkUrl}`
+		: `${CUSTOM_TRACK_PREFIX}${id}`;
+}
+
+/**
+ * A link or a name becomes one recording in its own one-track run. When the first look knows the length it goes straight
+ * to the acquire ladder; otherwise it waits as `resolving` while the add task reads it with yt-dlp, so the player never
+ * waits on that.
+ */
 export async function addWish(
 	input: string,
 	deps: WishDeps = {},
@@ -44,7 +50,8 @@ export async function addWish(
 			"a run is already in progress, add it when that one finishes",
 		);
 
-	const meta = await (deps.lookup ?? resolveWishInTask)(input);
+	const meta = await (deps.quick ?? quickWish)(input);
+	const known = meta.durationMs > 0;
 	const id = randomUUID();
 	const recordingId = `wish-${id}`;
 	const [run] = await db
@@ -63,17 +70,13 @@ export async function addWish(
 		artists: meta.artists,
 		isrcs: meta.isrc ? [meta.isrc] : [],
 		durationMs: meta.durationMs,
-		// Not a Spotify track; a pasted link rides along so the youtube provider can offer exactly it.
-		preferredSpotifyTrackId: meta.linkUrl
-			? `${CUSTOM_LINK_PREFIX}${meta.linkUrl}`
-			: `${CUSTOM_TRACK_PREFIX}${id}`,
-		status: "queued",
+		preferredSpotifyTrackId: customTrackId(meta, id),
+		status: known ? "queued" : "resolving",
 	});
 	try {
-		await (deps.trigger ?? triggerTask)("acquire.recording", {
-			runId: run.id,
-			recordingId,
-		});
+		const send = deps.trigger ?? triggerTask;
+		if (known) await send("acquire.recording", { runId: run.id, recordingId });
+		else await send("wishlist.add", { runId: run.id, recordingId, input });
 	} catch (err) {
 		await db
 			.update(migrationRun)
@@ -91,7 +94,13 @@ export type WishState = {
 	artists?: string[];
 };
 
-const WORKING = new Set(["queued", "searching", "fetching", "verifying"]);
+const WORKING = new Set([
+	"resolving",
+	"queued",
+	"searching",
+	"fetching",
+	"verifying",
+]);
 
 /** Where a wishlist track is in the ladder, in the terms the player shows. */
 export async function wishState(recordingId: string): Promise<WishState> {

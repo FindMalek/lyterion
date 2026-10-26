@@ -1,11 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import { playerSummary } from "@lyterion/common/library/player-summary";
 import { StartRunError } from "@lyterion/common/pipeline/start";
-import {
-	addWish,
-	resolveWishInTask,
-	wishState,
-} from "@lyterion/common/wishlist/add";
+import { addWish, wishState } from "@lyterion/common/wishlist/add";
+import { quickWish } from "@lyterion/common/wishlist/resolve";
 import { env } from "@lyterion/env/server";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
@@ -33,7 +30,7 @@ export const playerRouter = {
 		.input(z.object({ input: z.string().trim().min(2).max(300) }))
 		.handler(async ({ input }) => {
 			try {
-				return await resolveWishInTask(input.input);
+				return await quickWish(input.input);
 			} catch (err) {
 				throw new ORPCError("BAD_REQUEST", {
 					message: err instanceof Error ? err.message : String(err),

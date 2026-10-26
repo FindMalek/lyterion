@@ -17,6 +17,7 @@ export type RecordingStatus =
 	| "pending"
 	| "resolved"
 	| "waiting"
+	| "resolving"
 	| "queued"
 	| "searching"
 	| "fetching"
