@@ -236,7 +236,11 @@ export function createYoutubeLookup(options: YoutubeOptions = {}) {
 							? ("soundcloud" as const)
 							: ("youtube" as const),
 					}
-				: { source: "search" as const }),
+				: {
+						// The video the lookup found is the one to fetch, not whatever the provider's own search ranks first.
+						linkUrl: `https://www.youtube.com/watch?v=${entry.id}`,
+						source: "search" as const,
+					}),
 		};
 	};
 }
