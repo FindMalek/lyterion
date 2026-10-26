@@ -11,6 +11,12 @@
 		".": {
 			"default": "./src/index.ts"
 		},
+		"./wishlist/resolve": {
+			"default": "./src/wishlist/resolve.ts"
+		},
+		"./wishlist/add": {
+			"default": "./src/wishlist/add.ts"
+		},
 		"./pipeline/start": {
 			"default": "./src/pipeline/start.ts"
 		},

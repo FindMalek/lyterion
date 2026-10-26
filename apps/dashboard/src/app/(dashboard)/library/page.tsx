@@ -2,6 +2,7 @@ import { DuplicatesTable } from "@/components/app/duplicates-table";
 import { LibraryTable } from "@/components/app/library-table";
 import { LyricsBackfillButton } from "@/components/app/lyrics-backfill-button";
 import { ReconcilePlan } from "@/components/app/reconcile-plan";
+import { WishlistForm } from "@/components/app/wishlist-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { PageTabs } from "@/components/shared/page-tabs";
 
@@ -40,6 +41,7 @@ export default async function LibraryPage({
 					]}
 				/>
 			</PageHeader>
+			<WishlistForm />
 			{duplicates ? (
 				<DuplicatesTable />
 			) : reconcile ? (

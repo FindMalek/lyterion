@@ -1,5 +1,8 @@
+import { db } from "@lyterion/db";
+import { migrationRun } from "@lyterion/db/schema/run";
 import { env } from "@lyterion/env/server";
 import { logger, queue, task } from "@trigger.dev/sdk";
+import { eq } from "drizzle-orm";
 
 import { acquireRecording } from "../../acquire/acquire";
 import { diskGuard } from "../../acquire/disk";
@@ -30,6 +33,7 @@ import {
 import type { Provider } from "../../providers/types";
 import { createAcoustidClient } from "../../verify/acoustid";
 import { verifyFile } from "../../verify/index";
+import { WISHLIST_RUN_KIND } from "../../wishlist/custom";
 import { lidarrRequestTask } from "./lidarr-request";
 import { navidromeScanTask, requestScan } from "./navidrome-scan";
 
@@ -130,12 +134,22 @@ async function countAndContinue(runId: number, placed: boolean) {
 	if (stageComplete(progress)) await closeRun(runId);
 }
 
+async function isWishlistRun(runId: number) {
+	const [run] = await db
+		.select({ options: migrationRun.options })
+		.from(migrationRun)
+		.where(eq(migrationRun.id, runId));
+	return run?.options.kind === WISHLIST_RUN_KIND;
+}
+
 /** Exactly one caller closes the run: scans, asks Lidarr for the rest and tells the owner. */
 export async function closeRun(runId: number) {
 	if (await claimStage(runId, "finish")) {
 		await finishRun(runId, "done");
 		await navidromeScanTask.trigger({ force: true });
-		await lidarrRequestTask.trigger(undefined);
+		// A wishlist track is one song, not a library to complete.
+		if (!(await isWishlistRun(runId)))
+			await lidarrRequestTask.trigger(undefined);
 		const summary = await runSummary();
 		await notifyOwner({
 			kind: "run_finished",
