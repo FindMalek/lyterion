@@ -10,8 +10,7 @@ import { customTrackId, type WishAddPayload } from "../../wishlist/add";
 import { resolveWish } from "../../wishlist/resolve";
 import { acquireRecordingTask } from "./acquire-recording";
 
-// The api image has no yt-dlp, python, cookies or PO-token server, so the slow read of a link or a name happens here,
-// after the player already has its answer.
+// The slow yt-dlp read lives here, not in the api image (no yt-dlp, cookies or PO-token server), after the player has its answer.
 export const wishlistAddTask = task({
 	id: "wishlist.add",
 	maxDuration: 300,
