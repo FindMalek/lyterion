@@ -6,7 +6,11 @@ import { eq } from "drizzle-orm";
 
 import { setRecordingStatus } from "../../acquire/persist";
 import { finishRun } from "../../pipeline/advance";
-import { customTrackId, type WishAddPayload } from "../../wishlist/add";
+import {
+	customTrackId,
+	WISHLIST_PRIORITY_S,
+	type WishAddPayload,
+} from "../../wishlist/add";
 import { resolveWish } from "../../wishlist/resolve";
 import { acquireRecordingTask } from "./acquire-recording";
 
@@ -39,10 +43,10 @@ export const wishlistAddTask = task({
 					updatedAt: new Date(),
 				})
 				.where(eq(recording.id, payload.recordingId));
-			await acquireRecordingTask.trigger({
-				runId: payload.runId,
-				recordingId: payload.recordingId,
-			});
+			await acquireRecordingTask.trigger(
+				{ runId: payload.runId, recordingId: payload.recordingId },
+				{ priority: WISHLIST_PRIORITY_S },
+			);
 		} catch (err) {
 			logger.error("wishlist lookup failed", { error: String(err) });
 			await setRecordingStatus(payload.recordingId, "missing");

@@ -13,6 +13,9 @@ import {
 } from "./custom";
 import { quickWish, type WishMeta } from "./resolve";
 
+// Trigger.dev reads priority as seconds ahead in the queue: someone waiting at the player jumps the backlog.
+export const WISHLIST_PRIORITY_S = 600;
+
 export type WishPayload = { runId: number; recordingId: string };
 export type WishAddPayload = WishPayload & { input: string };
 
@@ -74,7 +77,10 @@ export async function addWish(
 		status: known ? "queued" : "resolving",
 	});
 	try {
-		const send = deps.trigger ?? triggerTask;
+		const send =
+			deps.trigger ??
+			((id, payload) =>
+				triggerTask(id, payload, { priority: WISHLIST_PRIORITY_S }));
 		if (known) await send("acquire.recording", { runId: run.id, recordingId });
 		else await send("wishlist.add", { runId: run.id, recordingId, input });
 	} catch (err) {
