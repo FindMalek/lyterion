@@ -5,7 +5,7 @@ import { recording } from "@lyterion/db/schema/library";
 import { migrationRun } from "@lyterion/db/schema/run";
 import { eq } from "drizzle-orm";
 
-import { StartRunError, triggerTask } from "../pipeline/start";
+import { runTask, StartRunError, triggerTask } from "../pipeline/start";
 import type { AcquirePayload } from "../trigger/tasks/acquire-recording";
 import {
 	CUSTOM_LINK_PREFIX,
@@ -13,6 +13,13 @@ import {
 	WISHLIST_RUN_KIND,
 } from "./custom";
 import { resolveWish, type WishMeta } from "./resolve";
+
+/** For the api, which has no yt-dlp: the lookup runs in the task image, where the cookies and PO-token server are. */
+export async function resolveWishInTask(input: string): Promise<WishMeta> {
+	const text = input.trim();
+	if (/deezer\.com|dzr\.page\.link/i.test(text)) return resolveWish(text);
+	return runTask<WishMeta>("wishlist.resolve", { input: text });
+}
 
 export type WishDeps = {
 	lookup?: (input: string) => Promise<WishMeta>;
@@ -34,7 +41,7 @@ export async function addWish(
 			"a run is already in progress, add it when that one finishes",
 		);
 
-	const meta = await (deps.lookup ?? resolveWish)(input);
+	const meta = await (deps.lookup ?? resolveWishInTask)(input);
 	const id = randomUUID();
 	const recordingId = `wish-${id}`;
 	const [run] = await db

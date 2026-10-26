@@ -36,6 +36,33 @@ export async function triggerTask(
 	}
 }
 
+/** Triggers a task and waits for its output, for the short lookups the player waits on. */
+export async function runTask<T>(
+	id: string,
+	payload: unknown,
+	timeoutMs = 90_000,
+): Promise<T> {
+	configureTrigger();
+	try {
+		const handle = await tasks.trigger(id, payload);
+		const run = await Promise.race([
+			runs.poll(handle.id, { pollIntervalMs: 500 }),
+			new Promise<never>((_, reject) =>
+				setTimeout(
+					() => reject(new Error(`${id} took too long, try again`)),
+					timeoutMs,
+				),
+			),
+		]);
+		if (run.isSuccess) return run.output as T;
+		throw new Error(run.error?.message ?? `${id} failed`);
+	} catch (err) {
+		throw new StartRunError(
+			err instanceof Error ? err.message : `Trigger.dev refused ${id}`,
+		);
+	}
+}
+
 /** Many runs of one task in as few calls as Trigger.dev allows (500 a batch). */
 export async function triggerTasks(
 	id: string,
