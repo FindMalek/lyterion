@@ -1,6 +1,7 @@
 import { randomInt, timingSafeEqual } from "node:crypto";
 
 import { countUsers } from "@lyterion/core";
+import { env } from "@lyterion/env/server";
 
 import { getCursor, setCursor } from "../notify/owner";
 
@@ -25,7 +26,7 @@ export async function ensureSetupCode(): Promise<string | null> {
 	if ((await countUsers()) > 0) return null;
 	const existing = await getCursor(KEY);
 	if (existing) return existing;
-	const code = generateSetupCode();
+	const code = env.LYTERION_SETUP_CODE ?? generateSetupCode();
 	await setCursor(KEY, code);
 	return code;
 }

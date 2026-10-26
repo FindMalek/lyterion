@@ -12,5 +12,7 @@ export const authModule = {
 		LYTERION_COOKIE_DOMAIN: z.string().min(1).optional(),
 		// keep-player reads the Spotify sync state with this (sent as x-lyterion-token); unset turns that API off.
 		LYTERION_PLAYER_TOKEN: z.string().min(24).optional(),
+		// Previews: a known onboarding code (in the PR comment) instead of a random one only the log shows.
+		LYTERION_SETUP_CODE: z.string().min(12).optional(),
 	},
 } as const;

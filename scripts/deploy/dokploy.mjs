@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Preview and production deploys on the-keep through the Dokploy API (D-036), see docs/infra.md.
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 
 const MODE = process.argv[2];
@@ -267,7 +267,52 @@ function formatUpdated(date) {
 		.replace(" PM", "pm");
 }
 
-function renderComment(rows) {
+/** A preview's onboarding code: stable across its redeploys, unguessable without the deploy key. */
+function previewSetupCode(pr) {
+	const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+	const bytes = createHash("sha256")
+		.update(`${DOKPLOY_API_KEY}:setup:${pr}`)
+		.digest();
+	const chars = [...bytes.subarray(0, 12)].map(
+		(b) => ALPHABET[b % ALPHABET.length],
+	);
+	return [0, 4, 8].map((i) => chars.slice(i, i + 4).join("")).join("-");
+}
+
+/** keep-player's demo Navidrome (generated music, demo/demo), as a preview's api reaches it on the Docker network. */
+async function demoNavidrome() {
+	const projects = await dokploy("project.all");
+	for (const project of projects)
+		for (const environment of project.environments ?? [])
+			for (const app of environment.applications ?? [])
+				if (app.name === "keep-player-demo") {
+					const { appName } = await query("application.one", {
+						applicationId: app.applicationId,
+					});
+					return appName ? `http://${appName}:4533` : null;
+				}
+	return null;
+}
+
+/** What to paste into the preview's onboarding. */
+function tryItBlock(setupCode, navidrome) {
+	return [
+		"",
+		"**Try it:** on onboarding paste",
+		"",
+		"```",
+		`setup code   ${setupCode}`,
+		...(navidrome
+			? [`navidrome    ${navidrome}`, "username     demo", "password     demo"]
+			: []),
+		"```",
+		navidrome
+			? "The Navidrome is keep-player's demo library (generated music), never yours: a preview is thrown away with the PR."
+			: "No demo Navidrome is deployed: run keep-player's Demo workflow first.",
+	];
+}
+
+function renderComment(rows, extra = []) {
 	const updated = formatUpdated(new Date());
 	const lines = rows.map((row) => {
 		const inspect = row.applicationId ? ` ([Inspect](${inspectUrl(row)}))` : "";
@@ -285,6 +330,7 @@ function renderComment(rows) {
 		"| Project | Deployment | Actions | Updated (UTC) |",
 		"| :--- | :----- | :------ | :------ |",
 		...lines,
+		...extra,
 	].join("\n");
 }
 
@@ -401,6 +447,7 @@ async function previewUp() {
 		`lyterion-db-${tag}`,
 		`lyterion-api-${tag}`,
 	);
+	const setupCode = previewSetupCode(pr);
 	const apps = appSpecs({
 		tag,
 		dashboardHost: `${tag}.${domain}`,
@@ -408,12 +455,16 @@ async function previewUp() {
 		cookieDomain: domain,
 		databaseUrl: postgresUrl(pg),
 		postgresId: pg.postgresId,
-		sharedEnv: parseEnvBlock(process.env.PREVIEW_APP_ENV),
+		sharedEnv: {
+			...parseEnvBlock(process.env.PREVIEW_APP_ENV),
+			LYTERION_SETUP_CODE: setupCode,
+		},
 	});
-	await upsertComment(renderComment(apps));
+	const tryIt = tryItBlock(setupCode, await demoNavidrome().catch(() => null));
+	await upsertComment(renderComment(apps, tryIt));
 	const deployed = await deployAll(environment, apps);
 	const ok = await waitForApps(deployed, () =>
-		upsertComment(renderComment(deployed)),
+		upsertComment(renderComment(deployed, tryIt)),
 	);
 	if (!ok) process.exitCode = 1;
 }
