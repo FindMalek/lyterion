@@ -6,16 +6,16 @@ import { migrationRun } from "@lyterion/db/schema/run";
 import { eq } from "drizzle-orm";
 
 import { StartRunError, triggerTask } from "../pipeline/start";
-import { createYoutubeLookup, type YoutubeMeta } from "../providers/youtube";
 import type { AcquirePayload } from "../trigger/tasks/acquire-recording";
 import {
+	CUSTOM_LINK_PREFIX,
 	CUSTOM_TRACK_PREFIX,
-	CUSTOM_YOUTUBE_PREFIX,
 	WISHLIST_RUN_KIND,
 } from "./custom";
+import { resolveWish, type WishMeta } from "./resolve";
 
 export type WishDeps = {
-	lookup?: (input: string) => Promise<YoutubeMeta>;
+	lookup?: (input: string) => Promise<WishMeta>;
 	trigger?: (id: string, payload: AcquirePayload) => Promise<void>;
 };
 
@@ -23,7 +23,7 @@ export type WishDeps = {
 export async function addWish(
 	input: string,
 	deps: WishDeps = {},
-): Promise<{ runId: number; recordingId: string; meta: YoutubeMeta }> {
+): Promise<{ runId: number; recordingId: string; meta: WishMeta }> {
 	const [live] = await db
 		.select({ id: migrationRun.id })
 		.from(migrationRun)
@@ -34,7 +34,7 @@ export async function addWish(
 			"a run is already in progress, add it when that one finishes",
 		);
 
-	const meta = await (deps.lookup ?? createYoutubeLookup())(input);
+	const meta = await (deps.lookup ?? resolveWish)(input);
 	const id = randomUUID();
 	const recordingId = `wish-${id}`;
 	const [run] = await db
@@ -51,10 +51,11 @@ export async function addWish(
 		id: recordingId,
 		title: meta.title,
 		artists: meta.artists,
+		isrcs: meta.isrc ? [meta.isrc] : [],
 		durationMs: meta.durationMs,
-		// Not a Spotify track; acquire only reads it to look up an album that isn't there.
-		preferredSpotifyTrackId: meta.videoId
-			? `${CUSTOM_YOUTUBE_PREFIX}${meta.videoId}`
+		// Not a Spotify track; a pasted link rides along so the youtube provider can offer exactly it.
+		preferredSpotifyTrackId: meta.linkUrl
+			? `${CUSTOM_LINK_PREFIX}${meta.linkUrl}`
 			: `${CUSTOM_TRACK_PREFIX}${id}`,
 		status: "queued",
 	});
@@ -71,4 +72,31 @@ export async function addWish(
 		throw err;
 	}
 	return { runId: run.id, recordingId, meta };
+}
+
+export type WishState = {
+	status: "working" | "placed" | "review" | "missing" | "gone";
+	stage: string;
+	title?: string;
+	artists?: string[];
+};
+
+const WORKING = new Set(["queued", "searching", "fetching", "verifying"]);
+
+/** Where a wishlist track is in the ladder, in the terms the player shows. */
+export async function wishState(recordingId: string): Promise<WishState> {
+	const [rec] = await db
+		.select()
+		.from(recording)
+		.where(eq(recording.id, recordingId))
+		.limit(1);
+	if (!rec?.id.startsWith("wish-")) return { status: "gone", stage: "gone" };
+	const named = { title: rec.title, artists: rec.artists };
+	if (WORKING.has(rec.status))
+		return { status: "working", stage: rec.status, ...named };
+	if (rec.status === "placed")
+		return { status: "placed", stage: rec.status, ...named };
+	if (rec.status === "review")
+		return { status: "review", stage: rec.status, ...named };
+	return { status: "missing", stage: rec.status, ...named };
 }

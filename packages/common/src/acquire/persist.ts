@@ -27,7 +27,7 @@ import {
 } from "../library/place";
 import { buildTags } from "../library/tags";
 import type { Candidate, RecordingTarget } from "../providers/types";
-import { CUSTOM_TRACK_PREFIX, youtubeIdOf } from "../wishlist/custom";
+import { CUSTOM_TRACK_PREFIX, linkOf } from "../wishlist/custom";
 import type { AcquireOutcome, VerifiedOk } from "./acquire";
 import { pacer } from "./pace";
 
@@ -110,7 +110,7 @@ export async function loadAcquireJob(
 			)
 				? null
 				: rec.preferredSpotifyTrackId,
-			youtubeId: youtubeIdOf(rec.preferredSpotifyTrackId),
+			linkUrl: linkOf(rec.preferredSpotifyTrackId),
 		},
 		// No release (a playlist-only track): a single named after the song, like beets' singleton fallback.
 		placement: {

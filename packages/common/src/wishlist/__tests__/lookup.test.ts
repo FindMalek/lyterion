@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	createYoutubeLookup,
 	createYoutubeProvider,
-	isYoutubeUrl,
+	isMediaLink,
 } from "../../providers/youtube";
 
 const lookupWith = (entry: object) =>
@@ -11,9 +11,9 @@ const lookupWith = (entry: object) =>
 
 describe("youtube lookup", () => {
 	it("knows a link from a name", () => {
-		expect(isYoutubeUrl("https://youtu.be/abc")).toBe(true);
-		expect(isYoutubeUrl("https://music.youtube.com/watch?v=abc")).toBe(true);
-		expect(isYoutubeUrl("massive attack teardrop")).toBe(false);
+		expect(isMediaLink("https://youtu.be/abc")).toBe(true);
+		expect(isMediaLink("https://music.youtube.com/watch?v=abc")).toBe(true);
+		expect(isMediaLink("massive attack teardrop")).toBe(false);
 	});
 
 	it("splits Artist - Title on a plain upload", async () => {
@@ -24,11 +24,12 @@ describe("youtube lookup", () => {
 				duration: 330.4,
 				channel: "Someone",
 			})("https://youtu.be/a"),
-		).toEqual({
+		).toMatchObject({
 			title: "Teardrop",
 			artists: ["Massive Attack"],
 			durationMs: 330400,
-			videoId: "a",
+			linkUrl: "https://youtu.be/a",
+			source: "youtube",
 		});
 	});
 
@@ -61,8 +62,13 @@ describe("pinned link", () => {
 				album: null,
 				durationMs: 132_000,
 				spotifyTrackId: null,
-				youtubeId: "YmBN_ZzSD_8",
+				linkUrl: "https://www.youtube.com/watch?v=YmBN_ZzSD_8",
 			}),
-		).toMatchObject([{ ref: "YmBN_ZzSD_8", matchConfidence: 1 }]);
+		).toMatchObject([
+			{
+				ref: "https://www.youtube.com/watch?v=YmBN_ZzSD_8",
+				matchConfidence: 1,
+			},
+		]);
 	});
 });

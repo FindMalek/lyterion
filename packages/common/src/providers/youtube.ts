@@ -33,6 +33,8 @@ export type YtEntry = {
 	uploader?: string;
 	artists?: string[];
 	artist?: string;
+	thumbnail?: string;
+	webpage_url?: string;
 };
 
 export type RunYtDlp = (args: string[]) => Promise<string>;
@@ -142,17 +144,22 @@ function makeRunner(options: YoutubeOptions): RunYtDlp {
 }
 
 export type YoutubeMeta = {
-	/** Set when the input was a link. */
-	videoId?: string;
+	/** Set when the input was a YouTube or SoundCloud link. */
+	linkUrl?: string;
+	coverUrl?: string;
+	isrc?: string;
+	source?: "youtube" | "soundcloud" | "deezer" | "search";
 	title: string;
 	artists: string[];
 	durationMs: number;
 };
 
-const YOUTUBE_URL = /^https?:\/\/((www|m|music)\.)?(youtube\.com|youtu\.be)\//i;
+const MEDIA_LINK =
+	/^https?:\/\/((www|m|music|on)\.)?(youtube\.com|youtu\.be|soundcloud\.com|snd\.sc)\//i;
 
-export function isYoutubeUrl(input: string): boolean {
-	return YOUTUBE_URL.test(input.trim());
+/** A link yt-dlp reads and downloads as is. */
+export function isMediaLink(input: string): boolean {
+	return MEDIA_LINK.test(input.trim());
 }
 
 const NAME_HITS = 5;
@@ -180,7 +187,7 @@ export function createYoutubeLookup(options: YoutubeOptions = {}) {
 	return async (input: string): Promise<YoutubeMeta> => {
 		const query = input.trim();
 		let entry: (YtEntry & { track?: string }) | undefined;
-		if (isYoutubeUrl(query)) {
+		if (isMediaLink(query)) {
 			entry = lines(
 				await run(["--dump-json", "--no-playlist", "--skip-download", query]),
 			)[0];
@@ -211,7 +218,16 @@ export function createYoutubeLookup(options: YoutubeOptions = {}) {
 			title: entry.track ?? split?.[2] ?? title,
 			artists: named ? [named] : [],
 			durationMs: Math.round(entry.duration * 1000),
-			...(isYoutubeUrl(query) ? { videoId: entry.id } : {}),
+			coverUrl:
+				entry.thumbnail ?? `https://i.ytimg.com/vi/${entry.id}/mqdefault.jpg`,
+			...(isMediaLink(query)
+				? {
+						linkUrl: entry.webpage_url ?? query,
+						source: /soundcloud|snd\.sc/i.test(query)
+							? ("soundcloud" as const)
+							: ("youtube" as const),
+					}
+				: { source: "search" as const }),
 		};
 	};
 }
@@ -235,11 +251,11 @@ export function createYoutubeProvider(options: YoutubeOptions = {}): Provider {
 		},
 
 		async search(target) {
-			if (target.youtubeId)
+			if (target.linkUrl)
 				return [
 					{
 						providerId: "youtube",
-						ref: target.youtubeId,
+						ref: target.linkUrl,
 						format: "opus",
 						bitrateKbps: OPUS_KBPS,
 						durationMs: target.durationMs,
@@ -283,7 +299,9 @@ export function createYoutubeProvider(options: YoutubeOptions = {}): Provider {
 				"0",
 				"-o",
 				path.join(dir, "%(id)s.%(ext)s"),
-				`https://music.youtube.com/watch?v=${candidate.ref}`,
+				candidate.ref.startsWith("http")
+					? candidate.ref
+					: `https://music.youtube.com/watch?v=${candidate.ref}`,
 			]);
 			const [file] = (await readdir(dir)).filter((f) => !f.endsWith(".part"));
 			if (!file)
