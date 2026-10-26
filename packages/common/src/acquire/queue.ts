@@ -8,7 +8,13 @@ import type { AcquireTodo } from "./persist";
 // A run marks its whole backlog `waiting` once, then keeps a small window `queued`; finishing tracks pull the next ones (#4).
 export const ACQUIRE_WINDOW = 20;
 
-const IN_FLIGHT = ["queued", "searching", "fetching", "verifying"] as const;
+const IN_FLIGHT = [
+	"resolving",
+	"queued",
+	"searching",
+	"fetching",
+	"verifying",
+] as const;
 const LEFT_BY_A_DEAD_RUN = ["waiting", ...IN_FLIGHT] as const;
 
 /** Only one run is ever running, so anything still waiting or in flight belongs to a run that died. */
