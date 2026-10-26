@@ -11,6 +11,9 @@
 		".": {
 			"default": "./src/index.ts"
 		},
+		"./wishlist/add": {
+			"default": "./src/wishlist/add.ts"
+		},
 		"./pipeline/start": {
 			"default": "./src/pipeline/start.ts"
 		},

@@ -30,6 +30,8 @@ export type RecordingTarget = {
 	album: string | null;
 	durationMs: number;
 	spotifyTrackId: string | null;
+	/** A pasted link: the youtube provider offers exactly this video instead of searching. */
+	youtubeId?: string;
 };
 
 export type Candidate = {

@@ -7,6 +7,7 @@ import { onboardingRouter } from "./onboarding";
 import { playerRouter } from "./player";
 import { reviewRouter } from "./review";
 import { runsRouter } from "./runs";
+import { wishlistRouter } from "./wishlist";
 
 export const appRouter = {
 	onboarding: onboardingRouter,
@@ -15,6 +16,7 @@ export const appRouter = {
 	review: reviewRouter,
 	library: libraryRouter,
 	player: playerRouter,
+	wishlist: wishlistRouter,
 	health: publicProcedure.handler(() => ({ ok: true as const })),
 	me: protectedProcedure.handler(({ context }) => ({
 		id: context.session.user.id,

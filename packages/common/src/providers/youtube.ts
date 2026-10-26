@@ -117,7 +117,7 @@ export function entryToCandidate(
 	};
 }
 
-export function createYoutubeProvider(options: YoutubeOptions = {}): Provider {
+function makeRunner(options: YoutubeOptions): RunYtDlp {
 	const base = [
 		...(options.cookiesPath ? ["--cookies", options.cookiesPath] : []),
 		...(options.potProviderUrl
@@ -129,7 +129,7 @@ export function createYoutubeProvider(options: YoutubeOptions = {}): Provider {
 		"--no-warnings",
 		"--no-progress",
 	];
-	const run: RunYtDlp =
+	return (
 		options.run ??
 		(async (args) => {
 			const bin = await resolveYtDlp(options.binary);
@@ -137,7 +137,87 @@ export function createYoutubeProvider(options: YoutubeOptions = {}): Provider {
 				maxBuffer: 32 * 1024 * 1024,
 			});
 			return stdout;
-		});
+		})
+	);
+}
+
+export type YoutubeMeta = {
+	/** Set when the input was a link. */
+	videoId?: string;
+	title: string;
+	artists: string[];
+	durationMs: number;
+};
+
+const YOUTUBE_URL = /^https?:\/\/((www|m|music)\.)?(youtube\.com|youtu\.be)\//i;
+
+export function isYoutubeUrl(input: string): boolean {
+	return YOUTUBE_URL.test(input.trim());
+}
+
+const NAME_HITS = 5;
+const MIN_NAME_SCORE = 0.6;
+const UPLOAD_NOISE =
+	/\s*[([](?:official|audio|video|lyrics?|visuali[sz]er|prod\b|hd|hq)[^)\]]*[)\]]/gi;
+
+function nameScore(query: string, entry: YtEntry): number {
+	const wanted = normalizeText(query).split(" ").filter(Boolean);
+	const found = new Set(
+		normalizeText(`${artistOf(entry)} ${entry.title}`).split(" "),
+	);
+	if (wanted.length === 0) return 0;
+	return wanted.filter((t) => found.has(t)).length / wanted.length;
+}
+
+/** What a pasted link or a typed name is, read from YouTube (best of the first hits for a name). */
+export function createYoutubeLookup(options: YoutubeOptions = {}) {
+	const run = makeRunner(options);
+	const lines = (stdout: string) =>
+		stdout
+			.split("\n")
+			.filter((l) => l.trim().startsWith("{"))
+			.map((l) => JSON.parse(l) as YtEntry & { track?: string });
+	return async (input: string): Promise<YoutubeMeta> => {
+		const query = input.trim();
+		let entry: (YtEntry & { track?: string }) | undefined;
+		if (isYoutubeUrl(query)) {
+			entry = lines(
+				await run(["--dump-json", "--no-playlist", "--skip-download", query]),
+			)[0];
+		} else {
+			const hits = lines(
+				await run([
+					"--flat-playlist",
+					"--dump-json",
+					`ytsearch${NAME_HITS}:${query}`,
+				]),
+			).filter((e) => e.duration);
+			// Max keeps the first of equal scores, so YouTube's own ranking breaks ties.
+			entry = hits.reduce<YtEntry | undefined>(
+				(best, e) =>
+					!best || nameScore(query, e) > nameScore(query, best) ? e : best,
+				undefined,
+			);
+			if (entry && nameScore(query, entry) < MIN_NAME_SCORE)
+				throw new Error(`no confident match for "${query}"`);
+		}
+		if (!entry?.duration) throw new Error(`nothing found for "${query}"`);
+		const artist = artistOf(entry);
+		const title = entry.title.replace(UPLOAD_NOISE, "").trim();
+		// Plain uploads carry "Artist - Title" in the title and no track field.
+		const split = entry.track ? null : title.match(/^(.+?)\s+-\s+(.+)$/);
+		const named = split?.[1] ?? artist;
+		return {
+			title: entry.track ?? split?.[2] ?? title,
+			artists: named ? [named] : [],
+			durationMs: Math.round(entry.duration * 1000),
+			...(isYoutubeUrl(query) ? { videoId: entry.id } : {}),
+		};
+	};
+}
+
+export function createYoutubeProvider(options: YoutubeOptions = {}): Provider {
+	const run = makeRunner(options);
 
 	return {
 		id: "youtube",
@@ -155,6 +235,19 @@ export function createYoutubeProvider(options: YoutubeOptions = {}): Provider {
 		},
 
 		async search(target) {
+			if (target.youtubeId)
+				return [
+					{
+						providerId: "youtube",
+						ref: target.youtubeId,
+						format: "opus",
+						bitrateKbps: OPUS_KBPS,
+						durationMs: target.durationMs,
+						isrcMatch: false,
+						matchConfidence: 1,
+						estimatedSeconds: 20,
+					},
+				];
 			const query = normalizeText(
 				`${target.artists[0] ?? ""} ${parseTitle(target.title).base}`,
 			);

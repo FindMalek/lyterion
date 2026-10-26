@@ -1,6 +1,5 @@
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-
 import { db } from "@lyterion/db";
 import {
 	candidate,
@@ -13,7 +12,6 @@ import {
 } from "@lyterion/db/schema/library";
 import { spotifyTrack } from "@lyterion/db/schema/spotify";
 import { and, eq, max, sql } from "drizzle-orm";
-
 import {
 	fetchLyrics,
 	measureLoudness,
@@ -29,6 +27,7 @@ import {
 } from "../library/place";
 import { buildTags } from "../library/tags";
 import type { Candidate, RecordingTarget } from "../providers/types";
+import { CUSTOM_TRACK_PREFIX, youtubeIdOf } from "../wishlist/custom";
 import type { AcquireOutcome, VerifiedOk } from "./acquire";
 import { pacer } from "./pace";
 
@@ -106,7 +105,12 @@ export async function loadAcquireJob(
 			artists: rec.artists,
 			album: rel?.title ?? null,
 			durationMs: rec.durationMs,
-			spotifyTrackId: rec.preferredSpotifyTrackId,
+			spotifyTrackId: rec.preferredSpotifyTrackId.startsWith(
+				CUSTOM_TRACK_PREFIX,
+			)
+				? null
+				: rec.preferredSpotifyTrackId,
+			youtubeId: youtubeIdOf(rec.preferredSpotifyTrackId),
 		},
 		// No release (a playlist-only track): a single named after the song, like beets' singleton fallback.
 		placement: {
