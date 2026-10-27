@@ -31,6 +31,7 @@ import { buildTags } from "../library/tags";
 import type { Candidate, RecordingTarget } from "../providers/types";
 import { youtubeThumbnailUrls } from "../providers/youtube";
 import { CUSTOM_TRACK_PREFIX, linkOf } from "../wishlist/custom";
+import { oembedMeta } from "../wishlist/resolve";
 import type { AcquireOutcome, VerifiedOk } from "./acquire";
 import { pacer } from "./pace";
 
@@ -187,6 +188,19 @@ async function youtubeCover(ref: string, dest: string): Promise<string | null> {
 	return null;
 }
 
+// Wishlist links (SoundCloud, YouTube) carry their artwork in the site's oEmbed.
+async function linkCover(
+	linkUrl: string,
+	dest: string,
+): Promise<string | null> {
+	const meta = await oembedMeta(linkUrl).catch(() => null);
+	if (!meta?.coverUrl) return null;
+	return downloadCover(
+		meta.coverUrl.replace(/-large\.jpg$/, "-t500x500.jpg"),
+		dest,
+	);
+}
+
 export function createPlacer(job: AcquireJob, options: PlaceOptions) {
 	return async (
 		staged: string,
@@ -202,6 +216,9 @@ export function createPlacer(job: AcquireJob, options: PlaceOptions) {
 				: null) ??
 			(chosen.providerId === "youtube"
 				? await youtubeCover(chosen.ref, `${staged}.cover-src.jpg`)
+				: null) ??
+			(target.linkUrl
+				? await linkCover(target.linkUrl, `${staged}.cover-src.jpg`)
 				: null);
 		const relativePath = libraryRelativePath({
 			albumArtist: placement.albumArtist,
