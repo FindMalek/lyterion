@@ -158,6 +158,24 @@ const MEDIA_LINK =
 	/^https?:\/\/((www|m|music|on)\.)?(youtube\.com|youtu\.be|soundcloud\.com|snd\.sc)\//i;
 
 /** A link yt-dlp reads and downloads as is. */
+/** Video id from a bare id or any youtube / youtu.be / music.youtube link, null for anything else. */
+export function youtubeVideoId(ref: string): string | null {
+	if (/^[\w-]{11}$/.test(ref)) return ref;
+	const match = ref.match(
+		/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/i,
+	);
+	return match?.[1] ?? null;
+}
+
+/** Largest thumbnail first: maxres is missing on many uploads, hq always exists. */
+export function youtubeThumbnailUrls(ref: string): string[] {
+	const id = youtubeVideoId(ref);
+	if (!id) return [];
+	return ["maxresdefault", "hqdefault"].map(
+		(size) => `https://i.ytimg.com/vi/${id}/${size}.jpg`,
+	);
+}
+
 export function isMediaLink(input: string): boolean {
 	return MEDIA_LINK.test(input.trim());
 }
