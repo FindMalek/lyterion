@@ -6,11 +6,8 @@ import { eq } from "drizzle-orm";
 
 import { setRecordingStatus } from "../../acquire/persist";
 import { finishRun } from "../../pipeline/advance";
-import {
-	customTrackId,
-	WISHLIST_PRIORITY_S,
-	type WishAddPayload,
-} from "../../wishlist/add";
+import { updateStageProgress } from "../../pipeline/progress";
+import { customTrackId, type WishAddPayload } from "../../wishlist/add";
 import { resolveWish } from "../../wishlist/resolve";
 import { acquireRecordingTask } from "./acquire-recording";
 
@@ -43,14 +40,21 @@ export const wishlistAddTask = task({
 					updatedAt: new Date(),
 				})
 				.where(eq(recording.id, payload.recordingId));
-			await acquireRecordingTask.trigger(
-				{ runId: payload.runId, recordingId: payload.recordingId },
-				{ priority: WISHLIST_PRIORITY_S },
-			);
+			await acquireRecordingTask.trigger({
+				runId: payload.runId,
+				recordingId: payload.recordingId,
+			});
 		} catch (err) {
-			logger.error("wishlist lookup failed", { error: String(err) });
+			const error = err instanceof Error ? err.message : String(err);
+			logger.error("wishlist add failed", { error });
 			await setRecordingStatus(payload.recordingId, "missing");
+			// On the run report instead of swallowed (#172).
+			await updateStageProgress(payload.runId, "wishlist.add", {
+				status: "failed",
+				error,
+			});
 			await finishRun(payload.runId, "failed");
+			throw err;
 		}
 	},
 });
