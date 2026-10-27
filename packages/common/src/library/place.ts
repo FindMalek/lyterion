@@ -53,6 +53,12 @@ export function resolveLibraryPath(
 }
 
 // Lossless above the cap gets resampled to FLAC 16/44.1 in place (D-017).
+const LOSSLESS_CODECS = new Set(["flac", "alac", "wav"]);
+
+export function isLosslessCodec(codec: string): boolean {
+	return LOSSLESS_CODECS.has(codec) || codec.startsWith("pcm_");
+}
+
 export async function downsampleToCap(
 	path: string,
 	facts: AudioFacts,
@@ -60,6 +66,8 @@ export async function downsampleToCap(
 ): Promise<boolean> {
 	const maxDepth = options.maxBitDepth ?? 16;
 	const maxRate = options.maxSampleRateHz ?? 44_100;
+	// Only lossless gets capped (D-017): opus is always 48 kHz and must stay opus.
+	if (!isLosslessCodec(facts.codec)) return false;
 	if ((facts.bitDepth ?? 0) <= maxDepth && facts.sampleRateHz <= maxRate)
 		return false;
 	const out = `${path}.cap.flac`;
