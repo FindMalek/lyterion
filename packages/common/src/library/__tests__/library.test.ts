@@ -195,3 +195,43 @@ describe.skipIf(!canTag)("placeFile", () => {
 		expect(upper.COMMENT).toBeUndefined();
 	});
 });
+
+describe.skipIf(!works("ffmpeg", ["-version"]))("downsampleToCap", () => {
+	it("caps hi-res flac but never re-encodes 48 kHz opus to flac", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "lyterion-cap-"));
+		const opus = join(dir, "yt.opus");
+		const flac = join(dir, "hires.flac");
+		execFileSync("ffmpeg", [
+			"-v",
+			"error",
+			"-y",
+			"-f",
+			"lavfi",
+			"-i",
+			"sine=d=2:r=48000",
+			"-c:a",
+			"libopus",
+			"-b:a",
+			"128k",
+			opus,
+		]);
+		execFileSync("ffmpeg", [
+			"-v",
+			"error",
+			"-y",
+			"-f",
+			"lavfi",
+			"-i",
+			"sine=d=2:r=96000",
+			"-c:a",
+			"flac",
+			flac,
+		]);
+		const options = { musicDir: dir, librarySubdir: "lyterion" };
+
+		expect(await downsampleToCap(opus, await probe(opus), options)).toBe(false);
+		expect((await probe(opus)).codec).toBe("opus");
+		expect(await downsampleToCap(flac, await probe(flac), options)).toBe(true);
+		expect((await probe(flac)).sampleRateHz).toBe(44_100);
+	});
+});

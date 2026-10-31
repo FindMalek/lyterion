@@ -4,7 +4,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { RecordingTarget } from "../types";
-import { createYoutubeProvider, entryToCandidate } from "../youtube";
+import {
+	createYoutubeProvider,
+	entryToCandidate,
+	youtubeThumbnailUrls,
+} from "../youtube";
 
 const target: RecordingTarget = {
 	recordingId: "r1",
@@ -98,5 +102,21 @@ describe("createYoutubeProvider", () => {
 		const file = await provider.fetch(found[0] as never, staging);
 		expect(path.extname(file.path)).toBe(".opus");
 		expect(await readFile(file.path, "utf8")).toBe("opus-bytes");
+	});
+});
+
+describe("youtubeThumbnailUrls", () => {
+	it("finds the video id in ids and every link shape, nothing for soundcloud", () => {
+		for (const ref of [
+			"dQw4w9WgXcQ",
+			"https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=x",
+			"https://music.youtube.com/watch?v=dQw4w9WgXcQ",
+			"https://youtu.be/dQw4w9WgXcQ?t=3",
+		]) {
+			expect(youtubeThumbnailUrls(ref)[0]).toBe(
+				"https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+			);
+		}
+		expect(youtubeThumbnailUrls("https://soundcloud.com/a/b")).toEqual([]);
 	});
 });

@@ -1,12 +1,12 @@
 import { db } from "@lyterion/db";
 import { recording } from "@lyterion/db/schema/library";
-import { migrationRun } from "@lyterion/db/schema/run";
 import { env } from "@lyterion/env/server";
 import { logger, task } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
 
 import { setRecordingStatus } from "../../acquire/persist";
 import { finishRun } from "../../pipeline/advance";
+import { updateStageProgress } from "../../pipeline/progress";
 import { customTrackId, type WishAddPayload } from "../../wishlist/add";
 import { resolveWish } from "../../wishlist/resolve";
 import { acquireRecordingTask } from "./acquire-recording";
@@ -45,13 +45,16 @@ export const wishlistAddTask = task({
 				recordingId: payload.recordingId,
 			});
 		} catch (err) {
-			logger.error("wishlist lookup failed", { error: String(err) });
+			const error = err instanceof Error ? err.message : String(err);
+			logger.error("wishlist add failed", { error });
 			await setRecordingStatus(payload.recordingId, "missing");
-			await db
-				.update(migrationRun)
-				.set({ report: { error: String(err) } })
-				.where(eq(migrationRun.id, payload.runId));
+			// On the run report instead of swallowed (#172).
+			await updateStageProgress(payload.runId, "wishlist.add", {
+				status: "failed",
+				error,
+			});
 			await finishRun(payload.runId, "failed");
+			throw err;
 		}
 	},
 });

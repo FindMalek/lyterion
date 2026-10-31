@@ -1,5 +1,7 @@
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import { db } from "@lyterion/db";
 import {
 	candidate,
@@ -27,9 +29,13 @@ import {
 } from "../library/place";
 import { buildTags } from "../library/tags";
 import type { Candidate, RecordingTarget } from "../providers/types";
+import { youtubeThumbnailUrls } from "../providers/youtube";
 import { CUSTOM_TRACK_PREFIX, linkOf } from "../wishlist/custom";
+import { oembedMeta } from "../wishlist/resolve";
 import type { AcquireOutcome, VerifiedOk } from "./acquire";
 import { pacer } from "./pace";
+
+const run = promisify(execFile);
 
 // D-023 priorities: higher runs first in quality.upgrade.
 const UPGRADE_PRIORITY: Record<string, number> = {
@@ -154,6 +160,47 @@ async function downloadCover(
 	}
 }
 
+// No release cover (YouTube only, wishlist): the video thumbnail, center-cropped to a square.
+async function youtubeCover(ref: string, dest: string): Promise<string | null> {
+	for (const url of youtubeThumbnailUrls(ref)) {
+		const raw = await downloadCover(url, `${dest}.raw.jpg`);
+		if (!raw) continue;
+		try {
+			await run("ffmpeg", [
+				"-v",
+				"error",
+				"-y",
+				"-i",
+				raw,
+				"-vf",
+				"crop='min(iw,ih)':'min(iw,ih)'",
+				"-q:v",
+				"2",
+				dest,
+			]);
+			return dest;
+		} catch {
+			return null;
+		} finally {
+			await rm(raw, { force: true });
+		}
+	}
+	return null;
+}
+
+// Wishlist links (SoundCloud, YouTube) carry their artwork in the site's oEmbed.
+async function linkCover(
+	linkUrl: string,
+	dest: string,
+): Promise<string | null> {
+	const meta = await oembedMeta(linkUrl).catch(() => null);
+	if (!meta?.coverUrl) return null;
+	return downloadCover(
+		meta.coverUrl.replace(/-large\.jpg$/, "-t500x500.jpg"),
+		dest,
+	);
+}
+
 export function createPlacer(job: AcquireJob, options: PlaceOptions) {
 	return async (
 		staged: string,
@@ -163,9 +210,16 @@ export function createPlacer(job: AcquireJob, options: PlaceOptions) {
 		await downsampleToCap(staged, verify.facts, options);
 		const { target, placement } = job;
 		const extension = path.extname(staged).slice(1) || chosen.format;
-		const coverPath = placement.coverUrl
-			? await downloadCover(placement.coverUrl, `${staged}.cover-src.jpg`)
-			: null;
+		const coverPath =
+			(placement.coverUrl
+				? await downloadCover(placement.coverUrl, `${staged}.cover-src.jpg`)
+				: null) ??
+			(chosen.providerId === "youtube"
+				? await youtubeCover(chosen.ref, `${staged}.cover-src.jpg`)
+				: null) ??
+			(target.linkUrl
+				? await linkCover(target.linkUrl, `${staged}.cover-src.jpg`)
+				: null);
 		const relativePath = libraryRelativePath({
 			albumArtist: placement.albumArtist,
 			artist: target.artists[0] ?? "Unknown Artist",
