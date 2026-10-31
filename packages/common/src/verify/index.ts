@@ -23,6 +23,7 @@ export * from "./preview";
 const LOSSLESS_MIN_CUTOFF_HZ = 20_500;
 const HIGH_BITRATE_MIN_CUTOFF_HZ = 17_000;
 const UNVERIFIED_MIN_CONFIDENCE = 0.9;
+const DURATION_RESCUE_MAX_MS = 30_000;
 
 export type UpgradeReason =
 	| "below_transparent"
@@ -78,11 +79,19 @@ export async function verifyFile(
 ): Promise<VerifyResult> {
 	if (!(await decodesCleanly(path))) return { ok: false, reason: "corrupt" };
 	const facts = await probe(path);
-	if (
+	const durationOff =
 		Math.abs(facts.durationMs - expect.durationMs) >
-		durationToleranceMs(expect.candidate)
-	) {
-		return { ok: false, reason: "duration", facts };
+		durationToleranceMs(expect.candidate);
+	if (durationOff) {
+		// A video intro or outro (#124): the Deezer preview still lines up inside the file.
+		const rescued =
+			expect.candidate.providerId === "youtube" &&
+			!expect.ownerPick &&
+			Math.abs(facts.durationMs - expect.durationMs) <=
+				DURATION_RESCUE_MAX_MS &&
+			deps.previewMatch &&
+			(await deps.previewMatch(path).catch(() => false));
+		if (!rescued) return { ok: false, reason: "duration", facts };
 	}
 
 	// YouTube returns covers and live takes for studio queries, so its files must be fingerprinted (#38).
