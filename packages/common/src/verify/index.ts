@@ -17,6 +17,7 @@ import {
 
 export * from "./acoustid";
 export * from "./audio";
+export * from "./preview";
 
 // Steps and thresholds: docs/verification.md (LAME 320 measures ~20.3 kHz), upgrade reasons: D-023.
 const LOSSLESS_MIN_CUTOFF_HZ = 20_500;
