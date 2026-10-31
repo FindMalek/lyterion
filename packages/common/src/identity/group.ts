@@ -12,6 +12,8 @@ export type GroupTrack = {
 	explicit: boolean;
 	popularity?: number;
 	mbRecordingId?: string | null;
+	/** From the file this track was downloaded as before: two fuzzy twins with different ones are different recordings (#131). */
+	acoustidRecording?: string | null;
 };
 
 export type GroupEdgeKind = "isrc" | "mb" | "fuzzy" | "fingerprint" | "manual";
@@ -66,6 +68,13 @@ function collectEdges(
 					const a = list[i];
 					const b = list[j];
 					if (!a || !b) continue;
+					if (
+						kind === "fuzzy" &&
+						a.acoustidRecording &&
+						b.acoustidRecording &&
+						a.acoustidRecording !== b.acoustidRecording
+					)
+						continue;
 					if (
 						kind === "fuzzy" &&
 						(!a.durationMs ||

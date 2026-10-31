@@ -24,6 +24,16 @@ function groupsOf(
 }
 
 describe("groupRecordings", () => {
+	it("does not fuzzy merge twins whose files are different acoustid recordings, but keeps isrc merges", () => {
+		const fuzzy = [
+			track("a", { acoustidRecording: "mb-1" }),
+			track("b", { acoustidRecording: "mb-2", durationMs: 201_000 }),
+		];
+		expect(groupsOf(fuzzy)).toEqual(["a", "b"]);
+		const sameIsrc = fuzzy.map((t) => ({ ...t, isrc: "USUG11904206" }));
+		expect(groupsOf(sameIsrc)).toEqual(["a+b"]);
+	});
+
 	it("keeps zero length tracks with the same title apart", () => {
 		const tracks = [
 			track("a", { title: "Serial Killer", durationMs: 0 }),
