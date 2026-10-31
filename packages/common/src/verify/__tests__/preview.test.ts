@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { deezerPreviewUrl, isPreviewMatch } from "../preview";
+import {
+	deezerPreviewUrl,
+	deezerSearchPreviewUrl,
+	isPreviewMatch,
+} from "../preview";
 
 function noise(n: number, seed: number): number[] {
 	let s = seed;
@@ -31,5 +35,23 @@ describe("preview match", () => {
 			"https://cdn/p.mp3",
 		);
 		expect(await deezerPreviewUrl("X", unknown)).toBeNull();
+	});
+
+	it("searches by artist and title and takes the hit with the same length", async () => {
+		const search = (async () =>
+			new Response(
+				JSON.stringify({
+					data: [
+						{ preview: "https://cdn/live.mp3", duration: 301 },
+						{ preview: "https://cdn/studio.mp3", duration: 263 },
+					],
+				}),
+			)) as unknown as typeof fetch;
+		expect(
+			await deezerSearchPreviewUrl(
+				{ title: "Vice Grip", artists: ["Parkway Drive"], durationMs: 263_000 },
+				search,
+			),
+		).toBe("https://cdn/studio.mp3");
 	});
 });
