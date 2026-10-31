@@ -21,7 +21,7 @@ import {
 } from "../../upgrade/persist";
 import { describeQuality, isUpgrade } from "../../upgrade/quality";
 import { createAcoustidClient } from "../../verify/acoustid";
-import { verifyFile } from "../../verify/index";
+import { matchesDeezerPreview, verifyFile } from "../../verify/index";
 import { acquireQueue } from "./acquire-recording";
 import { requestScan } from "./navidrome-scan";
 
@@ -86,7 +86,16 @@ export async function runUpgrade(fileIds?: number[]) {
 				verifyFile(
 					path,
 					{ durationMs: job.target.durationMs, mbRecordingIds: [], candidate },
-					lookup ? { lookupFingerprint: (fp) => lookup.lookup(fp) } : {},
+					{
+						...(lookup ? { lookupFingerprint: (fp) => lookup.lookup(fp) } : {}),
+						previewMatch: (f) =>
+							matchesDeezerPreview(f, {
+								isrc: job.target.isrcs[0],
+								title: job.target.title,
+								artists: job.target.artists,
+								durationMs: job.target.durationMs,
+							}),
+					},
 				),
 			pick: groq ? groqPickAsk(groq.apiKey) : undefined,
 			place: async (staged, candidate, verify) => {
