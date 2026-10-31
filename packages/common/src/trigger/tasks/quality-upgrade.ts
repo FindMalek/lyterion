@@ -134,7 +134,16 @@ export async function runUpgrade(fileIds?: number[]) {
 				pathChanged: outcome.path !== file.path,
 			});
 			if (client && file.navidromeSongId)
-				await clearSignal(client, file.navidromeSongId, file.upgradeSignal);
+				await clearSignal(
+					client,
+					file.navidromeSongId,
+					file.upgradeSignal,
+				).catch((err: unknown) =>
+					logger.warn("upgrade signal cleanup failed", {
+						fileId: file.id,
+						error: String(err),
+					}),
+				);
 			await albumGainAfterPlace(file.releaseId, env.LYTERION_PYTHON);
 			await requestScan();
 			await notifier.notify({
