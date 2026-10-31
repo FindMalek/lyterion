@@ -22,20 +22,22 @@ export const reviewReverifyTask = task({
 	id: "review.reverify",
 	maxDuration: 6 * 3600,
 	run: async ({ limit, dryRun = true }: ReverifyPayload = {}) => {
-		const reviews = (await openReviews()).filter((r) => r.isrcs[0]);
+		const reviews = await openReviews();
 		let checked = 0;
 		const matched: { reviewId: number; candidateId: number }[] = [];
 		for (const review of reviews) {
 			if (limit && checked >= limit) break;
 			checked++;
-			const isrc = review.isrcs[0] as string;
 			for (const c of review.candidates) {
 				if (!c.previewable) continue;
 				const staged = await stagedCandidate(c.id);
 				if (!staged?.stagedPath || !(await exists(staged.stagedPath))) continue;
-				const ok = await matchesDeezerPreview(staged.stagedPath, isrc).catch(
-					() => false,
-				);
+				const ok = await matchesDeezerPreview(staged.stagedPath, {
+					isrc: review.isrcs[0],
+					title: review.title,
+					artists: review.artists,
+					durationMs: review.durationMs,
+				}).catch(() => false);
 				if (!ok) continue;
 				matched.push({ reviewId: review.id, candidateId: c.id });
 				if (!dryRun)

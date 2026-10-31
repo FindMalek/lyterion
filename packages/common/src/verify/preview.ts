@@ -24,6 +24,38 @@ export async function deezerPreviewUrl(
 	return data.error || !data.preview ? null : data.preview;
 }
 
+export type PreviewTarget = {
+	isrc?: string | undefined;
+	title: string;
+	artists: string[];
+	durationMs: number;
+};
+
+const SEARCH_DURATION_TOLERANCE_S = 3;
+
+/** No isrc: the first deezer search hit with the same length. A wrong hit just fails the fingerprint compare. */
+export async function deezerSearchPreviewUrl(
+	target: Pick<PreviewTarget, "title" | "artists" | "durationMs">,
+	doFetch: typeof fetch = fetch,
+): Promise<string | null> {
+	const q = `artist:"${target.artists[0] ?? ""}" track:"${target.title}"`;
+	const res = await doFetch(
+		`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=10`,
+		{ signal: AbortSignal.timeout(10_000) },
+	);
+	if (!res.ok) return null;
+	const data = (await res.json()) as {
+		data?: { preview?: string; duration?: number }[];
+	};
+	const hit = data.data?.find(
+		(t) =>
+			t.preview &&
+			Math.abs((t.duration ?? 0) - target.durationMs / 1000) <=
+				SEARCH_DURATION_TOLERANCE_S,
+	);
+	return hit?.preview ?? null;
+}
+
 export async function rawFingerprint(path: string): Promise<number[]> {
 	const { stdout } = await run("fpcalc", ["-raw", "-length", "900", path], {
 		maxBuffer: 64 * 1024 * 1024,
@@ -61,13 +93,15 @@ export function isPreviewMatch(preview: number[], full: number[]): boolean {
 	return bestBitErrorRate(preview, full) <= PREVIEW_MAX_BER;
 }
 
-/** Downloads the Deezer preview for the isrc and compares it with the file; false when deezer has none. */
+/** Downloads the Deezer preview (by isrc, else by search) and compares it with the file; false when deezer has none. */
 export async function matchesDeezerPreview(
 	path: string,
-	isrc: string,
+	target: PreviewTarget,
 	doFetch: typeof fetch = fetch,
 ): Promise<boolean> {
-	const url = await deezerPreviewUrl(isrc, doFetch);
+	const url =
+		(target.isrc ? await deezerPreviewUrl(target.isrc, doFetch) : null) ??
+		(await deezerSearchPreviewUrl(target, doFetch));
 	if (!url) return false;
 	const res = await doFetch(url, { signal: AbortSignal.timeout(30_000) });
 	if (!res.ok) return false;

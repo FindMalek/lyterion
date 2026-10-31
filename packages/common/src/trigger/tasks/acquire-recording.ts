@@ -88,12 +88,13 @@ export async function acquireOne(
 				{ durationMs: job.target.durationMs, mbRecordingIds: [], candidate },
 				{
 					...(lookup ? { lookupFingerprint: (fp) => lookup.lookup(fp) } : {}),
-					...(job.target.isrcs[0]
-						? {
-								previewMatch: (file) =>
-									matchesDeezerPreview(file, job.target.isrcs[0] as string),
-							}
-						: {}),
+					previewMatch: (file) =>
+						matchesDeezerPreview(file, {
+							isrc: job.target.isrcs[0],
+							title: job.target.title,
+							artists: job.target.artists,
+							durationMs: job.target.durationMs,
+						}),
 				},
 			),
 		place: createPlacer(job, placeOptions),
