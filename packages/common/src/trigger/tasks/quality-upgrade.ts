@@ -134,7 +134,16 @@ export async function runUpgrade(fileIds?: number[]) {
 				pathChanged: outcome.path !== file.path,
 			});
 			if (client && file.navidromeSongId)
-				await clearSignal(client, file.navidromeSongId, file.upgradeSignal);
+				await clearSignal(
+					client,
+					file.navidromeSongId,
+					file.upgradeSignal,
+				).catch((err: unknown) =>
+					logger.warn("upgrade signal cleanup failed", {
+						fileId: file.id,
+						error: String(err),
+					}),
+				);
 			await albumGainAfterPlace(file.releaseId, env.LYTERION_PYTHON);
 			await requestScan();
 			await notifier.notify({
@@ -172,16 +181,14 @@ async function clearSignal(
 	signal: "rating" | "playlist" | null,
 ) {
 	if (signal === "rating") await client.setRating(songId, 0);
-	if (signal === "playlist") {
-		const playlist = (await client.playlists()).find(
-			(p) => p.name === UPGRADE_PLAYLIST_NAME,
-		);
-		if (!playlist) return;
-		const songs = await client.playlistSongs(playlist.id);
-		const indexes = songs.flatMap((id, i) => (id === songId ? [i] : []));
-		if (indexes.length > 0)
-			await client.removeFromPlaylist(playlist.id, indexes);
-	}
+	// Whatever flagged it, an upgraded song leaves the playlist (#184).
+	const playlist = (await client.playlists()).find(
+		(p) => p.name === UPGRADE_PLAYLIST_NAME,
+	);
+	if (!playlist) return;
+	const songs = await client.playlistSongs(playlist.id);
+	const indexes = songs.flatMap((id, i) => (id === songId ? [i] : []));
+	if (indexes.length > 0) await client.removeFromPlaylist(playlist.id, indexes);
 }
 
 export const qualityUpgradeTask = task({
