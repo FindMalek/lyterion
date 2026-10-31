@@ -21,6 +21,7 @@ import type {
 // Last resort (docs/providers.md, D-021): yt-dlp against YouTube Music, opus at ~160 kbps, always fingerprinted.
 const SEARCH_LIMIT = 10;
 const DURATION_TOLERANCE_S = 4;
+const TOPIC_TOLERANCE_S = 2;
 const OPUS_KBPS = 160;
 const RELEASE_URL =
 	"https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux";
@@ -77,12 +78,23 @@ export async function resolveYtDlp(binary?: string): Promise<string> {
 	return cached;
 }
 
+const TOPIC = /\s+-\s+Topic$/;
+
 function artistOf(entry: YtEntry): string {
 	return (
 		entry.artists?.[0] ??
 		entry.artist ??
-		(entry.channel ?? entry.uploader ?? "").replace(/\s+-\s+Topic$/, "")
+		(entry.channel ?? entry.uploader ?? "").replace(TOPIC, "")
 	);
+}
+
+function artistsOf(entry: YtEntry): string[] {
+	const names = [
+		...(entry.artists ?? []),
+		...(entry.artist ? [entry.artist] : []),
+		(entry.channel ?? entry.uploader ?? "").replace(TOPIC, ""),
+	];
+	return names.map(normalizeArtist).filter(Boolean);
 }
 
 export function entryToCandidate(
@@ -102,9 +114,16 @@ export function entryToCandidate(
 		found.base.split(" ").includes(t),
 	).length;
 	if (titleTokens.length === 0 || hits / titleTokens.length < 0.8) return null;
-	const artistMatch =
-		normalizeArtist(artistOf(entry)) ===
-		normalizeArtist(target.artists[0] ?? "");
+	const wantedArtists = target.artists.map(normalizeArtist);
+	const artistMatch = artistsOf(entry).some((a) => wantedArtists.includes(a));
+	// The label's own auto upload (#125): right artist, exact title, same length is as good as a fingerprint hit.
+	const isTopic = TOPIC.test(entry.channel ?? entry.uploader ?? "");
+	const labelMaster =
+		isTopic &&
+		artistMatch &&
+		found.base === wanted.base &&
+		entry.duration !== undefined &&
+		Math.abs(entry.duration - target.durationMs / 1000) <= TOPIC_TOLERANCE_S;
 	return {
 		providerId: "youtube",
 		ref: entry.id,
@@ -113,8 +132,7 @@ export function entryToCandidate(
 		durationMs:
 			entry.duration !== undefined ? entry.duration * 1000 : undefined,
 		isrcMatch: false,
-		// Topic channels are the label's own upload of the album track; still never certain without a fingerprint.
-		matchConfidence: artistMatch ? 0.85 : 0.6,
+		matchConfidence: labelMaster ? 0.95 : artistMatch ? 0.85 : 0.6,
 		estimatedSeconds: 20,
 	};
 }
