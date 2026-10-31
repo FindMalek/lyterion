@@ -1,4 +1,7 @@
 import { execFile } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
@@ -56,4 +59,27 @@ export function bestBitErrorRate(preview: number[], full: number[]): number {
 
 export function isPreviewMatch(preview: number[], full: number[]): boolean {
 	return bestBitErrorRate(preview, full) <= PREVIEW_MAX_BER;
+}
+
+/** Downloads the Deezer preview for the isrc and compares it with the file; false when deezer has none. */
+export async function matchesDeezerPreview(
+	path: string,
+	isrc: string,
+	doFetch: typeof fetch = fetch,
+): Promise<boolean> {
+	const url = await deezerPreviewUrl(isrc, doFetch);
+	if (!url) return false;
+	const res = await doFetch(url, { signal: AbortSignal.timeout(30_000) });
+	if (!res.ok) return false;
+	const dir = await mkdtemp(join(tmpdir(), "lyterion-preview-"));
+	try {
+		const file = join(dir, "preview.mp3");
+		await writeFile(file, Buffer.from(await res.arrayBuffer()));
+		return isPreviewMatch(
+			await rawFingerprint(file),
+			await rawFingerprint(path),
+		);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
 }
