@@ -23,8 +23,27 @@ function mmss(ms: number) {
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+type Group = NonNullable<ReturnType<typeof useDuplicates>["data"]>[number];
+
+function useDuplicates() {
+	return useQuery(orpc.library.duplicates.queryOptions());
+}
+
+// Fuzzy merges with a different isrc are the only ones worth a look.
+function isUnconfirmed(group: Group) {
+	const best = group.members.find((m) => m.trackId === m.preferred);
+	return group.members.some(
+		(m) =>
+			m.edge === "fuzzy" &&
+			m.trackId !== m.preferred &&
+			(!m.isrc || !best?.isrc || m.isrc !== best.isrc),
+	);
+}
+
 export function DuplicatesTable() {
-	const { data } = useQuery(orpc.library.duplicates.queryOptions());
+	const { data: all } = useDuplicates();
+	const [showAll, setShowAll] = useState(false);
+	const data = showAll ? all : all?.filter(isUnconfirmed);
 	const [done, setDone] = useState<Set<string>>(new Set());
 	const [mergeFrom, setMergeFrom] = useState<{
 		id: string;
@@ -43,7 +62,7 @@ export function DuplicatesTable() {
 		onError: (err) => toast.error(err.message),
 	});
 
-	if (data && data.length === 0)
+	if (all && all.length === 0)
 		return (
 			<EmptyState
 				icon={Icons.layers}
@@ -63,15 +82,28 @@ export function DuplicatesTable() {
 						the recording to merge it into.
 					</span>
 				) : (
-					"Spotify tracks grouped into one file (D-006). Split out a different version, or merge two recordings of the same song. Changes apply on the next run."
+					"Stored once, not duplicated: Spotify tracks grouped into one file (D-006). By default only fuzzy merges without a shared ISRC show. Split out a different version, or merge two recordings of the same song. Changes apply on the next run."
 				)
 			}
 			actions={
-				mergeFrom && (
-					<Button size="xs" variant="ghost" onClick={() => setMergeFrom(null)}>
-						Cancel merge
+				<>
+					{mergeFrom && (
+						<Button
+							size="xs"
+							variant="ghost"
+							onClick={() => setMergeFrom(null)}
+						>
+							Cancel merge
+						</Button>
+					)}
+					<Button
+						size="xs"
+						variant="ghost"
+						onClick={() => setShowAll((v) => !v)}
+					>
+						{showAll ? "Only worth a look" : `Show all ${all?.length ?? ""}`}
 					</Button>
-				)
+				</>
 			}
 		>
 			{!data && (
