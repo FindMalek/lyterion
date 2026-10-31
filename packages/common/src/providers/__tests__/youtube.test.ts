@@ -33,8 +33,25 @@ describe("entryToCandidate", () => {
 			providerId: "youtube",
 			format: "opus",
 			bitrateKbps: 160,
-			matchConfidence: 0.85,
+			matchConfidence: 0.95,
 		});
+		expect(
+			entryToCandidate(target, {
+				id: "a2",
+				title: "Teardrop",
+				duration: 333,
+				channel: "Massive Attack - Topic",
+			})?.matchConfidence,
+		).toBe(0.85);
+		expect(
+			entryToCandidate(target, {
+				id: "a3",
+				title: "Teardrop",
+				duration: 330,
+				channel: "Massive Attack Official",
+				artists: ["Massive Attack", "Horace Andy"],
+			})?.matchConfidence,
+		).toBe(0.85);
 		expect(
 			entryToCandidate(target, {
 				id: "b",
