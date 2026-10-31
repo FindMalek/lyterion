@@ -111,6 +111,29 @@ describe.skipIf(!hasFfmpeg)("verifyFile", () => {
 		});
 	});
 
+	it("takes an unknown YouTube file that matches the deezer preview", async () => {
+		const result = await verifyFile(
+			noise("yt-preview.flac"),
+			{
+				durationMs: 12_000,
+				mbRecordingIds: [],
+				candidate: {
+					...flac,
+					providerId: "youtube",
+					format: "opus",
+					isrcMatch: false,
+					matchConfidence: 0.6,
+				},
+			},
+			{ previewMatch: async () => true },
+		);
+		expect(result).toMatchObject({
+			ok: true,
+			verdict: "match",
+			upgradeReason: "youtube_source",
+		});
+	});
+
 	it("rejects a file whose length is off by more than the tolerance", async () => {
 		const result = await verifyFile(noise("short.flac"), {
 			durationMs: 200_000,

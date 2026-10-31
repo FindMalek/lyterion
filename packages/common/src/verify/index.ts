@@ -63,6 +63,8 @@ export type VerifyResult =
 
 export type VerifyDeps = {
 	lookupFingerprint?: (fp: Fingerprint) => Promise<AcoustidResult[]>;
+	/** Same master as the Deezer preview of the target isrc: settles what acoustid does not know. */
+	previewMatch?: (path: string) => Promise<boolean>;
 };
 
 function durationToleranceMs(candidate: Candidate): number {
@@ -87,6 +89,7 @@ export async function verifyFile(
 	if (
 		expect.candidate.providerId === "youtube" &&
 		!deps.lookupFingerprint &&
+		!deps.previewMatch &&
 		!expect.ownerPick
 	)
 		return { ok: false, reason: "no_fingerprint", facts };
@@ -99,6 +102,10 @@ export async function verifyFile(
 			await deps.lookupFingerprint(fp),
 			expect.mbRecordingIds,
 		);
+	}
+	if (verdict === "unknown" && deps.previewMatch) {
+		const matched = await deps.previewMatch(path).catch(() => false);
+		if (matched) verdict = "match";
 	}
 	if (verdict === "mismatch" && !expect.ownerPick)
 		return { ok: false, reason: "wrong_recording", facts };

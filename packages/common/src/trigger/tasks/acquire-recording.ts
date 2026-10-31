@@ -32,7 +32,7 @@ import {
 } from "../../pipeline/advance";
 import type { Provider } from "../../providers/types";
 import { createAcoustidClient } from "../../verify/acoustid";
-import { verifyFile } from "../../verify/index";
+import { matchesDeezerPreview, verifyFile } from "../../verify/index";
 import { WISHLIST_RUN_KIND } from "../../wishlist/custom";
 import { lidarrRequestTask } from "./lidarr-request";
 import { navidromeScanTask, requestScan } from "./navidrome-scan";
@@ -86,7 +86,15 @@ export async function acquireOne(
 			verifyFile(
 				path,
 				{ durationMs: job.target.durationMs, mbRecordingIds: [], candidate },
-				lookup ? { lookupFingerprint: (fp) => lookup.lookup(fp) } : {},
+				{
+					...(lookup ? { lookupFingerprint: (fp) => lookup.lookup(fp) } : {}),
+					...(job.target.isrcs[0]
+						? {
+								previewMatch: (file) =>
+									matchesDeezerPreview(file, job.target.isrcs[0] as string),
+							}
+						: {}),
+				},
 			),
 		place: createPlacer(job, placeOptions),
 		pick: groq ? groqPickAsk(groq.apiKey) : undefined,
