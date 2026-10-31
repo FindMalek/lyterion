@@ -24,6 +24,14 @@ function groupsOf(
 }
 
 describe("groupRecordings", () => {
+	it("keeps zero length tracks with the same title apart", () => {
+		const tracks = [
+			track("a", { title: "Serial Killer", durationMs: 0 }),
+			track("b", { title: "Serial Killer", durationMs: 0 }),
+		];
+		expect(groupsOf(tracks)).toEqual(["a", "b"]);
+	});
+
 	it("merges the same song across single, album and remaster but keeps other versions apart", () => {
 		const tracks = [
 			track("single", { isrc: "USUG11904206" }),

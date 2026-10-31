@@ -68,7 +68,9 @@ function collectEdges(
 					if (!a || !b) continue;
 					if (
 						kind === "fuzzy" &&
-						Math.abs(a.durationMs - b.durationMs) > DURATION_TOLERANCE_MS
+						(!a.durationMs ||
+							!b.durationMs ||
+							Math.abs(a.durationMs - b.durationMs) > DURATION_TOLERANCE_MS)
 					)
 						continue;
 					edges.push({ from: a.id, to: b.id, kind });
