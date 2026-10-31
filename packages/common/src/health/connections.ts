@@ -100,6 +100,11 @@ export async function testSpotifyApp(
 			detail: `accounts.spotify.com unreachable: ${res.cause instanceof Error ? res.cause.message : res.message}`,
 		};
 	if (res.ok) return { ok: true };
+	if (res.status === 429)
+		return {
+			ok: true,
+			detail: `rate limited, retry in ${res.headers.get("retry-after") ?? "?"}s`,
+		};
 	const body = (await res.json().catch(() => ({}))) as {
 		error?: string;
 		error_description?: string;

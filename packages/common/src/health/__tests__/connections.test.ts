@@ -72,6 +72,17 @@ describe("testSpotifyApp", () => {
 		});
 	});
 
+	it("does not report a rate limit as down", async () => {
+		const doFetch = (async () =>
+			new Response("", {
+				status: 429,
+				headers: { "retry-after": "30" },
+			})) as unknown as typeof fetch;
+		expect(
+			await testSpotifyApp({ clientId: "a", clientSecret: "b" }, doFetch),
+		).toEqual({ ok: true, detail: "rate limited, retry in 30s" });
+	});
+
 	it("accepts a token", async () => {
 		let auth = "";
 		const doFetch = (async (_url: string, init: RequestInit) => {
