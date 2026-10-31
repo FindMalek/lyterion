@@ -1,5 +1,6 @@
 import { db } from "@lyterion/db";
 import {
+	libraryFile,
 	recording,
 	recordingMember,
 	recordingOverride,
@@ -11,7 +12,15 @@ import {
 	spotifyAlbum,
 	spotifyTrack,
 } from "@lyterion/db/schema/spotify";
-import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
+import {
+	and,
+	eq,
+	inArray,
+	isNotNull,
+	isNull,
+	notInArray,
+	sql,
+} from "drizzle-orm";
 
 import { chunk } from "../trigger/utils/chunk";
 import {
@@ -23,7 +32,7 @@ import {
 const BATCH = 500;
 
 export async function loadResolveInput() {
-	const [tracks, albums, saved, members, previous, overrides] =
+	const [tracks, albums, saved, members, previous, overrides, files] =
 		await Promise.all([
 			db.select().from(spotifyTrack).where(eq(spotifyTrack.isLocal, false)),
 			db.select().from(spotifyAlbum),
@@ -41,7 +50,26 @@ export async function loadResolveInput() {
 				.select({ id: recording.id, placed: recording.placedReleaseIds })
 				.from(recording),
 			db.select().from(recordingOverride),
+			db
+				.select({
+					recordingId: libraryFile.recordingId,
+					acoustid: libraryFile.acoustidRecording,
+				})
+				.from(libraryFile)
+				.where(
+					and(
+						eq(libraryFile.owned, true),
+						isNotNull(libraryFile.recordingId),
+						isNotNull(libraryFile.acoustidRecording),
+					),
+				),
 		]);
+	const acoustidOfRecording = new Map(
+		files.map((f) => [f.recordingId, f.acoustid]),
+	);
+	const recordingOfTrack = new Map(
+		members.map((m) => [m.spotifyTrackId, m.recordingId]),
+	);
 	return {
 		tracks: tracks.map((t) => ({
 			id: t.id,
@@ -54,6 +82,8 @@ export async function loadResolveInput() {
 			albumId: t.albumId,
 			discNumber: t.discNumber,
 			trackNumber: t.trackNumber,
+			acoustidRecording:
+				acoustidOfRecording.get(recordingOfTrack.get(t.id) ?? "") ?? null,
 		})),
 		albums: albums.map((a) => ({
 			id: a.id,
