@@ -83,6 +83,15 @@ describe("testSpotifyApp", () => {
 		).toEqual({ ok: true, detail: "rate limited, retry in 30s" });
 	});
 
+	it("does not report a timeout as down", async () => {
+		const doFetch = (async () => {
+			throw new DOMException("timed out", "TimeoutError");
+		}) as unknown as typeof fetch;
+		expect(
+			await testSpotifyApp({ clientId: "a", clientSecret: "b" }, doFetch),
+		).toEqual({ ok: true, detail: "accounts.spotify.com timed out" });
+	});
+
 	it("accepts a token", async () => {
 		let auth = "";
 		const doFetch = (async (_url: string, init: RequestInit) => {

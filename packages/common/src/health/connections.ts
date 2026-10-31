@@ -94,6 +94,8 @@ export async function testSpotifyApp(
 		body: "grant_type=client_credentials",
 		signal: AbortSignal.timeout(TIMEOUT_MS),
 	}).catch((err: unknown) => err as Error);
+	if (res instanceof Error && res.name === "TimeoutError")
+		return { ok: true, detail: "accounts.spotify.com timed out" };
 	if (res instanceof Error)
 		return {
 			ok: false,
