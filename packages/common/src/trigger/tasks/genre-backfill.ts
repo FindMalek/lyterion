@@ -16,8 +16,7 @@ async function exists(path: string): Promise<boolean> {
 	}
 }
 
-// Opt in (D-054): fills a missing GENRE on files Lyterion didn't write, from the Spotify artist genres. Never replaces a
-// genre that is there, and touches nothing else. Dry run unless `apply: true`.
+// D-054: opt-in fill of a missing GENRE on files Lyterion didn't write, dry run unless `apply: true`.
 export const genreBackfillTask = task({
 	id: "genre.backfill",
 	queue: { name: "library", concurrencyLimit: 1 },
