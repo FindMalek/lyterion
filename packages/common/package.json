@@ -29,6 +29,9 @@
 		"./dashboard": {
 			"default": "./src/dashboard/queries.ts"
 		},
+		"./library/genre-backfill": {
+			"default": "./src/library/genre-backfill.ts"
+		},
 		"./library/followed-artists": {
 			"default": "./src/library/followed-artists.ts"
 		},
