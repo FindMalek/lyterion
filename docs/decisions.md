@@ -611,3 +611,11 @@ migration) and the queue hides it, the task is triggered with
 `priority: 3600` so it runs ahead of bulk downloads, and a failure writes
 `failed:<reason>` so the item comes back with the reason shown. A pick
 older than 2 hours that never resolved (a crashed task) shows again.
+
+## D-054 Opt-in genre backfill on files Lyterion didn't write (2026-11-03, narrows D-012)
+
+Most of the existing library has no genre, so the player's genres page is empty (FindMalek/lodesong#437).
+`genre.backfill` fills a missing `GENRE` from the Spotify genres of the track's first artist, for files that
+are matched to a recording but not owned. It only writes when the file has no genre at all, writes only that tag
+(merge mode, nothing else is rewritten), and is a dry run unless triggered with `{ "apply": true }`. The dry run
+returns how many files would change and a sample of 20. Every other part of D-012 stands.
