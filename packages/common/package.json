@@ -29,6 +29,9 @@
 		"./dashboard": {
 			"default": "./src/dashboard/queries.ts"
 		},
+		"./library/followed-artists": {
+			"default": "./src/library/followed-artists.ts"
+		},
 		"./library/player-summary": {
 			"default": "./src/library/player-summary.ts"
 		},

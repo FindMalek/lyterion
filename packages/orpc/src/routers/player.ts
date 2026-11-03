@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { followedArtists } from "@lyterion/common/library/followed-artists";
 import { playerSummary } from "@lyterion/common/library/player-summary";
 import { StartRunError } from "@lyterion/common/pipeline/start";
 import { addWish, wishState } from "@lyterion/common/wishlist/add";
@@ -31,6 +32,10 @@ export const playerRouter = {
 	summary: playerProcedure
 		.route({ method: "GET", path: "/player/summary" })
 		.handler(() => playerSummary()),
+	// Who the owner follows on Spotify, for keep-player's "follow from spotify".
+	followedArtists: playerProcedure
+		.route({ method: "GET", path: "/player/followed-artists" })
+		.handler(() => followedArtists()),
 	// What a pasted link or name is, before anything is added (the preview card).
 	wishlistPreview: playerProcedure
 		.route({ method: "POST", path: "/player/wishlist/preview" })
