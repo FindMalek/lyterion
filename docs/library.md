@@ -63,7 +63,10 @@ FLAC, Ogg Vorbis, Opus, MP3 and M4A. It follows Picard naming:
   minutes, never per track, since a scan covers the whole library. Then
   poll `getScanStatus`.
 - **`library.link`** after each scan: map recording → Navidrome song ID by
-  path (the Subsonic song has `path`) or by the `LYTERION_RECORDING_ID` tag.
+  path or by the `LYTERION_RECORDING_ID` tag. The path is the real one from
+  Navidrome's native API (`/api/song`): since 0.64 the Subsonic song's `path`
+  is a generated `Artist/Album/01-05 - Title.flac`, so it only serves as the
+  fallback when the native listing fails.
 - **Stars** (Subsonic `star`):
   - liked songs → star song
   - saved albums → star album

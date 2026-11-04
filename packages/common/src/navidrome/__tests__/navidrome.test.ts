@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createNavidromeClient } from "../client";
-import { linkByPath, scanDue } from "../link";
+import { linkByPath, linkFiles, scanDue, withRealPaths } from "../link";
 
 describe("linkByPath", () => {
 	it("maps absolute library files to Navidrome's relative song paths", () => {
@@ -24,6 +24,41 @@ describe("linkByPath", () => {
 			"/music",
 		);
 		expect([...links]).toEqual([[1, "nd-1"]]);
+	});
+});
+
+describe("linkFiles", () => {
+	const files = [
+		{
+			id: 1,
+			path: "/music/lyterion/Pearl Jam/Ten (1991)/05 Black.flac",
+		},
+	];
+	// Navidrome 0.64 answers Subsonic with a made-up path, but the native API still has the real one.
+	const subsonic = async () => [
+		{ id: "nd-1", path: "Pearl Jam/Ten/01-05 - Black.flac" },
+	];
+	const native = async () => [
+		{ id: "nd-1", path: "lyterion/Pearl Jam/Ten (1991)/05 Black.flac" },
+	];
+
+	it("links by the native real path, and falls back to Subsonic's when the native listing fails", async () => {
+		expect([
+			...(await linkFiles(files, { native, subsonic }, "/music")),
+		]).toEqual([[1, "nd-1"]]);
+		const failing = async () => {
+			throw new Error("HTTP 401");
+		};
+		const fallback = async () => [
+			{ id: "nd-2", path: "lyterion/Pearl Jam/Ten (1991)/05 Black.flac" },
+		];
+		expect([
+			...(await linkFiles(
+				files,
+				{ native: failing, subsonic: fallback },
+				"/music",
+			)),
+		]).toEqual([[1, "nd-2"]]);
 	});
 });
 
@@ -186,5 +221,37 @@ describe("matchExisting", () => {
 				"r-fuzzy": "fuzzy",
 			},
 		);
+	});
+});
+
+describe("withRealPaths", () => {
+	it("gives Subsonic songs their real path, so Lyterion's own files are not indexed as the owner's", async () => {
+		const songs = [
+			{
+				id: "nd-1",
+				title: "Black",
+				artist: "Pearl Jam",
+				duration: 343,
+				path: "Pearl Jam/Ten/01-05 - Black.flac",
+			},
+		];
+		const native = async () => [
+			{ id: "nd-1", path: "lyterion/Pearl Jam/Ten (1991)/05 Black.flac" },
+		];
+		const recordings = [
+			{
+				id: "r-1",
+				isrcs: [],
+				mbRecordingId: null,
+				title: "Black",
+				artists: ["Pearl Jam"],
+				durationMs: 343_000,
+			},
+		];
+		expect(matchExisting(recordings, songs, "lyterion").size).toBe(1);
+		const real = await withRealPaths(songs, native, "/music");
+		expect(real[0]?.path).toBe("lyterion/Pearl Jam/Ten (1991)/05 Black.flac");
+		expect(matchExisting(recordings, real, "lyterion").size).toBe(0);
+		expect(await withRealPaths(songs, undefined, "/music")).toEqual(songs);
 	});
 });

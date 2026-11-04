@@ -2,6 +2,10 @@ import type { NavidromeCredentials } from "./client";
 
 const TIMEOUT_MS = 30_000;
 
+export type NativeSong = { id: string; path?: string };
+
+const SONG_PAGE = 500;
+
 export type NativePlaylist = {
 	id: string;
 	name: string;
@@ -48,6 +52,17 @@ export function createNativeClient(
 	}
 
 	return {
+		/** Every song with its real file path: Subsonic's `path` is a made-up one on Navidrome 0.64. */
+		async songs(): Promise<NativeSong[]> {
+			const songs: NativeSong[] = [];
+			for (let start = 0; ; start += SONG_PAGE) {
+				const page = await call<NativeSong[]>(
+					`/api/song?_start=${start}&_end=${start + SONG_PAGE}&_sort=id&_order=ASC`,
+				);
+				songs.push(...page);
+				if (page.length < SONG_PAGE) return songs;
+			}
+		},
 		playlists: () => call<NativePlaylist[]>("/api/playlist?_end=10000"),
 		/** Stop syncing a playlist from its file: it keeps its songs and id, and becomes editable everywhere. */
 		async stopSync(id: string): Promise<void> {

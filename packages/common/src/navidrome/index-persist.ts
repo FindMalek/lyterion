@@ -6,14 +6,24 @@ import { inArray, sql } from "drizzle-orm";
 
 import type { NavidromeClient } from "./client";
 import { matchExisting } from "./index";
+import { withRealPaths } from "./link";
+import type { NativeSong } from "./native";
 
 // Existing files are read-only input (D-012): recorded with owned = false and never moved or deleted.
 export async function indexExistingLibrary(
 	client: NavidromeClient,
-	options: { musicDir: string; librarySubdir: string },
+	options: {
+		musicDir: string;
+		librarySubdir: string;
+		native?: () => Promise<NativeSong[]>;
+	},
 ): Promise<{ songs: number; existing: number }> {
 	const [songs, recordings] = await Promise.all([
-		client.allSongs(),
+		client
+			.allSongs()
+			.then((listed) =>
+				withRealPaths(listed, options.native, options.musicDir),
+			),
 		db
 			.select({
 				id: recording.id,
