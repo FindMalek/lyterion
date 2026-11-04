@@ -2,8 +2,7 @@ import path from "node:path";
 
 type LinkSong = { id: string; path?: string } & Record<string, unknown>;
 
-// Navidrome's native API reports real paths relative to its music folder (an absolute one is cut back to it); ours are
-// absolute inside our mount of the same folder.
+// Real paths are relative to Navidrome's music folder (an absolute one is cut back to it); ours are absolute in our mount.
 export function linkByPath(
 	files: { id: number; path: string }[],
 	songs: LinkSong[],
