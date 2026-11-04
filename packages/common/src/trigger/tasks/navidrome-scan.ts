@@ -5,11 +5,12 @@ import { getCredentials } from "../../credentials/store";
 import { syncPlaylistsToNavidrome } from "../../library/playlists-navidrome";
 import { createNavidromeClient } from "../../navidrome/client";
 import {
-	linkByPath,
+	linkFiles,
 	SCAN_BATCH,
 	SCAN_QUIET_MS,
 	scanDue,
 } from "../../navidrome/link";
+import { createNativeClient } from "../../navidrome/native";
 import {
 	markScanned,
 	notePlaced,
@@ -46,9 +47,12 @@ export const navidromeScanTask = task({
 		await markScanned(state.pending);
 
 		const files = await unlinkedFiles();
-		const links = linkByPath(
+		const links = await linkFiles(
 			files,
-			files.length > 0 ? await client.allSongs() : [],
+			{
+				native: () => createNativeClient(creds).songs(),
+				subsonic: () => client.allSongs(),
+			},
 			env.LYTERION_MUSIC_DIR,
 		);
 		const linked = await saveLinks(links, files);

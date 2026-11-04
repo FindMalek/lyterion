@@ -7,6 +7,7 @@ import { getCredentials } from "../../credentials/store";
 import { runIdentityResolve } from "../../identity/persist";
 import { createNavidromeClient } from "../../navidrome/client";
 import { indexExistingLibrary } from "../../navidrome/index-persist";
+import { createNativeClient } from "../../navidrome/native";
 import { finishRun } from "../../pipeline/advance";
 import { errorText, updateStageProgress } from "../../pipeline/progress";
 import { ACQUIRE_STAGE } from "./acquire-recording";
@@ -44,6 +45,7 @@ export const identityResolveTask = task({
 						{
 							musicDir: env.LYTERION_MUSIC_DIR,
 							librarySubdir: env.LYTERION_LIBRARY_SUBDIR,
+							native: () => createNativeClient(navidrome).songs(),
 						},
 					);
 					logger.info("existing library indexed", indexed);
