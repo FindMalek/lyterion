@@ -53,7 +53,15 @@ export const playerRouter = {
 	wishlistSearch: playerProcedure
 		.route({ method: "POST", path: "/player/wishlist/search" })
 		.input(z.object({ input: z.string().trim().min(2).max(300) }))
-		.handler(({ input }) => searchCandidates(input.input)),
+		.handler(({ input }) =>
+			searchCandidates(input.input, {
+				youtubeOptions: {
+					cookiesPath: env.LYTERION_YTDLP_COOKIES_PATH,
+					potProviderUrl: env.LYTERION_YTDLP_POT_PROVIDER_URL,
+					binary: env.LYTERION_YTDLP_PATH,
+				},
+			}),
+		),
 	wishlistAdd: playerProcedure
 		.route({ method: "POST", path: "/player/wishlist" })
 		.input(z.object({ input: z.string().trim().min(2).max(300) }))

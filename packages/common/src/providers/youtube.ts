@@ -37,7 +37,7 @@ export type YtEntry = {
 	thumbnail?: string;
 	webpage_url?: string;
 	url?: string;
-	thumbnails?: { url: string }[];
+	thumbnails?: { url: string; width?: number }[];
 };
 
 export type RunYtDlp = (args: string[]) => Promise<string>;
@@ -46,6 +46,8 @@ export type YoutubeOptions = {
 	cookiesPath?: string;
 	potProviderUrl?: string;
 	binary?: string;
+	/** Kills the yt-dlp child after this long. */
+	timeoutMs?: number;
 	run?: RunYtDlp;
 	// One yt-dlp call at a time across tasks, with jitter (docs/providers.md queue `youtube`).
 	pace?: () => Promise<void>;
@@ -157,6 +159,8 @@ export function makeRunner(options: YoutubeOptions): RunYtDlp {
 			const bin = await resolveYtDlp(options.binary);
 			const { stdout } = await exec(bin, [...base, ...args], {
 				maxBuffer: 32 * 1024 * 1024,
+				timeout: options.timeoutMs,
+				killSignal: "SIGKILL",
 			});
 			return stdout;
 		})

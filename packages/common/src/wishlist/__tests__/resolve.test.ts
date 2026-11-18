@@ -180,3 +180,40 @@ describe("searchCandidates", () => {
 		});
 	});
 });
+
+describe("searchCandidates arguments", () => {
+	it("keeps a typed query inside one argument after the fixed prefix", async () => {
+		const seen: string[][] = [];
+		const run = async (args: string[]) => {
+			seen.push(args);
+			return "";
+		};
+		await searchCandidates("--exec x", { deezer: async () => [], run });
+		await searchCandidates("ytsearch9:foo", { deezer: async () => [], run });
+		expect(seen.map((args) => args.slice(0, 2))).toEqual(
+			seen.map(() => ["--flat-playlist", "--dump-json"]),
+		);
+		expect(seen.map((args) => args[2]).sort()).toEqual([
+			"scsearch3:--exec x",
+			"scsearch3:ytsearch9:foo",
+			"ytsearch3:--exec x",
+			"ytsearch3:ytsearch9:foo",
+		]);
+		expect(seen.every((args) => args.length === 3)).toBe(true);
+	});
+
+	it("does not call deezer unreachable for one hit without an artist", async () => {
+		const hits = {
+			data: [
+				{ id: 1, title: "Orphan", duration: 100 },
+				{
+					id: 2,
+					title: "Teardrop",
+					duration: 327,
+					artist: { name: "Massive Attack" },
+				},
+			],
+		};
+		expect(await deezerCandidates("teardrop", jsonFetch(hits))).toHaveLength(1);
+	});
+});

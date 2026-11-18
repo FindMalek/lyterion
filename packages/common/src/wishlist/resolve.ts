@@ -26,6 +26,17 @@ type DeezerTrack = {
 	error?: unknown;
 };
 
+function trackMeta(track: DeezerTrack): WishMeta {
+	return {
+		title: track.title,
+		artists: [track.artist.name],
+		durationMs: track.duration * 1000,
+		isrc: track.isrc,
+		coverUrl: track.album?.cover_medium,
+		source: "deezer",
+	};
+}
+
 /** Deezer audio is DRM-protected, so a Deezer link is only read for what the song is, then found like a typed name. */
 export async function deezerMeta(
 	url: string,
@@ -42,14 +53,7 @@ export async function deezerMeta(
 	const track = (await res.json()) as DeezerTrack;
 	if (!res.ok || track.error || !track.duration)
 		throw new Error("deezer doesn't know that track");
-	return {
-		title: track.title,
-		artists: [track.artist.name],
-		durationMs: track.duration * 1000,
-		isrc: track.isrc,
-		coverUrl: track.album?.cover_medium,
-		source: "deezer",
-	};
+	return trackMeta(track);
 }
 
 export type ResolveDeps = {
@@ -108,14 +112,7 @@ export async function deezerSearch(
 		if (!best || score > best.score) best = { track, score };
 	}
 	if (!best || best.score < SEARCH_MIN_SCORE) return null;
-	return {
-		title: best.track.title,
-		artists: [best.track.artist.name],
-		durationMs: best.track.duration * 1000,
-		isrc: best.track.isrc,
-		coverUrl: best.track.album?.cover_medium,
-		source: "deezer",
-	};
+	return trackMeta(best.track);
 }
 
 /** A YouTube or SoundCloud link read through the site's oEmbed: no yt-dlp, so no length yet (the add task reads it). */
@@ -197,19 +194,39 @@ export async function deezerCandidates(
 	const data = (await res.json()) as { data?: DeezerTrack[]; error?: unknown };
 	if (data.error) throw new Error("deezer search failed");
 	return (data.data ?? [])
-		.filter((track) => track.id && track.duration)
+		.filter((track) => track.id && track.duration && track.artist?.name)
 		.map((track) => ({
-			title: track.title,
-			artists: [track.artist.name],
-			durationMs: track.duration * 1000,
-			isrc: track.isrc,
-			coverUrl: track.album?.cover_medium,
-			source: "deezer" as const,
+			...trackMeta(track),
 			input: `https://www.deezer.com/track/${track.id}`,
 		}));
 }
 
 const MEDIA_SEARCH_TIMEOUT_MS = 12_000;
+const MEDIA_SEARCH_CONCURRENCY = 4;
+const MIN_COVER_PX = 120;
+
+let searching = 0;
+const waiting: (() => void)[] = [];
+
+async function withSlot<T>(task: () => Promise<T>): Promise<T> {
+	if (searching >= MEDIA_SEARCH_CONCURRENCY)
+		await new Promise<void>((resolve) => waiting.push(resolve));
+	searching++;
+	try {
+		return await task();
+	} finally {
+		searching--;
+		waiting.shift()?.();
+	}
+}
+
+/** The smallest thumbnail that is still sharp, so the player can inline it. */
+function smallThumbnail(entry: YtEntry): string | undefined {
+	const sized = (entry.thumbnails ?? [])
+		.filter((t) => (t.width ?? 0) >= MIN_COVER_PX)
+		.sort((a, b) => (a.width ?? 0) - (b.width ?? 0));
+	return sized[0]?.url ?? entry.thumbnails?.at(-1)?.url;
+}
 
 /** One site's top hits through yt-dlp's flat search (no per-video fetch): quick; a slow or failing site throws. */
 async function mediaSearch(
@@ -219,15 +236,9 @@ async function mediaSearch(
 	limit: number,
 ): Promise<WishCandidate[]> {
 	const prefix = site === "youtube" ? "ytsearch" : "scsearch";
-	const stdout = await Promise.race([
+	const stdout = await withSlot(() =>
 		run(["--flat-playlist", "--dump-json", `${prefix}${limit}:${query}`]),
-		new Promise<never>((_, reject) =>
-			setTimeout(
-				() => reject(new Error("timed out")),
-				MEDIA_SEARCH_TIMEOUT_MS,
-			).unref(),
-		),
-	]);
+	);
 	return stdout
 		.split("\n")
 		.filter((line) => line.trim().startsWith("{"))
@@ -250,7 +261,7 @@ async function mediaSearch(
 					artists: artist ? [artist] : [],
 					durationMs: Math.round(entry.duration * 1000),
 					coverUrl:
-						entry.thumbnails?.at(-1)?.url ??
+						smallThumbnail(entry) ??
 						(site === "youtube"
 							? `https://i.ytimg.com/vi/${entry.id}/mqdefault.jpg`
 							: undefined),
@@ -265,6 +276,7 @@ async function mediaSearch(
 export type SearchDeps = {
 	deezer?: (query: string) => Promise<WishCandidate[]>;
 	run?: RunYtDlp;
+	youtubeOptions?: YoutubeOptions;
 };
 
 /** Deezer first, then SoundCloud and YouTube; a source that fails or times out is named in `unreachable`. */
@@ -272,7 +284,12 @@ export async function searchCandidates(
 	query: string,
 	deps: SearchDeps = {},
 ): Promise<{ candidates: WishCandidate[]; unreachable: string[] }> {
-	const run = deps.run ?? makeRunner({});
+	const run =
+		deps.run ??
+		makeRunner({
+			...deps.youtubeOptions,
+			timeoutMs: MEDIA_SEARCH_TIMEOUT_MS,
+		});
 	const sources = {
 		deezer: (deps.deezer ?? deezerCandidates)(query),
 		soundcloud: mediaSearch("soundcloud", query, run, 3),
