@@ -36,6 +36,8 @@ export type YtEntry = {
 	artist?: string;
 	thumbnail?: string;
 	webpage_url?: string;
+	url?: string;
+	thumbnails?: { url: string }[];
 };
 
 export type RunYtDlp = (args: string[]) => Promise<string>;
@@ -137,7 +139,7 @@ export function entryToCandidate(
 	};
 }
 
-function makeRunner(options: YoutubeOptions): RunYtDlp {
+export function makeRunner(options: YoutubeOptions): RunYtDlp {
 	const base = [
 		...(options.cookiesPath ? ["--cookies", options.cookiesPath] : []),
 		...(options.potProviderUrl

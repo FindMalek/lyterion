@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { deezerMeta, quickWish, resolveWish } from "../resolve";
+import {
+	deezerCandidates,
+	deezerMeta,
+	quickWish,
+	resolveWish,
+	searchCandidates,
+} from "../resolve";
 
 const deezerFetch = (async (url: string) => ({
 	ok: true,
@@ -110,6 +116,67 @@ describe("quickWish", () => {
 			title: "Flickermood",
 			artists: ["Forss"],
 			source: "soundcloud",
+		});
+	});
+});
+
+describe("deezerCandidates", () => {
+	it("lists hits with the track link the add takes, skipping ones without a length", async () => {
+		const hits = {
+			data: [
+				{
+					id: 7,
+					title: "Teardrop",
+					duration: 327,
+					artist: { name: "Massive Attack" },
+				},
+				{
+					id: 8,
+					title: "Broken",
+					duration: 0,
+					artist: { name: "Massive Attack" },
+				},
+			],
+		};
+		expect(await deezerCandidates("teardrop", jsonFetch(hits))).toMatchObject([
+			{
+				title: "Teardrop",
+				artists: ["Massive Attack"],
+				durationMs: 327000,
+				source: "deezer",
+				input: "https://www.deezer.com/track/7",
+			},
+		]);
+	});
+});
+
+describe("searchCandidates", () => {
+	it("puts deezer first and keeps the rest when a source fails", async () => {
+		const deezer = async () => [
+			{
+				title: "Teardrop",
+				artists: ["Massive Attack"],
+				durationMs: 327000,
+				source: "deezer" as const,
+				input: "https://www.deezer.com/track/7",
+			},
+		];
+		const run = async (args: string[]) => {
+			if (args.some((a) => a.startsWith("scsearch"))) throw new Error("down");
+			return `${JSON.stringify({ id: "abc", title: "Massive Attack - Teardrop", duration: 330, uploader: "MA" })}\n`;
+		};
+		const { candidates: found, unreachable } = await searchCandidates(
+			"teardrop",
+			{ deezer, run },
+		);
+		expect(unreachable).toEqual(["soundcloud"]);
+		expect(found.map((c) => [c.source, c.input])).toEqual([
+			["deezer", "https://www.deezer.com/track/7"],
+			["youtube", "https://www.youtube.com/watch?v=abc"],
+		]);
+		expect(found[1]).toMatchObject({
+			title: "Teardrop",
+			artists: ["Massive Attack"],
 		});
 	});
 });

@@ -2,9 +2,12 @@ import { normalizeText } from "../identity/normalize";
 import {
 	createYoutubeLookup,
 	isMediaLink,
+	makeRunner,
 	parseUpload,
+	type RunYtDlp,
 	type YoutubeMeta,
 	type YoutubeOptions,
+	type YtEntry,
 } from "../providers/youtube";
 
 export type WishMeta = YoutubeMeta;
@@ -14,6 +17,7 @@ const DEEZER_TRACK =
 const DEEZER_SHORT = /^https?:\/\/(?:link\.deezer\.com|dzr\.page\.link)\//i;
 
 type DeezerTrack = {
+	id?: number;
 	title: string;
 	duration: number;
 	isrc?: string;
@@ -176,4 +180,116 @@ export async function quickWish(
 			source: "search",
 		}
 	);
+}
+
+export type WishCandidate = WishMeta & { input: string };
+
+/** Up to eight Deezer hits for a typed name to pick from; `input` is the track link the add then takes. */
+export async function deezerCandidates(
+	query: string,
+	doFetch: typeof fetch = fetch,
+): Promise<WishCandidate[]> {
+	const res = await doFetch(
+		`https://api.deezer.com/search/track?limit=8&q=${encodeURIComponent(query)}`,
+		{ signal: AbortSignal.timeout(6_000) },
+	);
+	if (!res.ok) throw new Error(`deezer answered ${res.status}`);
+	const data = (await res.json()) as { data?: DeezerTrack[]; error?: unknown };
+	if (data.error) throw new Error("deezer search failed");
+	return (data.data ?? [])
+		.filter((track) => track.id && track.duration)
+		.map((track) => ({
+			title: track.title,
+			artists: [track.artist.name],
+			durationMs: track.duration * 1000,
+			isrc: track.isrc,
+			coverUrl: track.album?.cover_medium,
+			source: "deezer" as const,
+			input: `https://www.deezer.com/track/${track.id}`,
+		}));
+}
+
+const MEDIA_SEARCH_TIMEOUT_MS = 12_000;
+
+/** One site's top hits through yt-dlp's flat search (no per-video fetch): quick; a slow or failing site throws. */
+async function mediaSearch(
+	site: "youtube" | "soundcloud",
+	query: string,
+	run: RunYtDlp,
+	limit: number,
+): Promise<WishCandidate[]> {
+	const prefix = site === "youtube" ? "ytsearch" : "scsearch";
+	const stdout = await Promise.race([
+		run(["--flat-playlist", "--dump-json", `${prefix}${limit}:${query}`]),
+		new Promise<never>((_, reject) =>
+			setTimeout(
+				() => reject(new Error("timed out")),
+				MEDIA_SEARCH_TIMEOUT_MS,
+			).unref(),
+		),
+	]);
+	return stdout
+		.split("\n")
+		.filter((line) => line.trim().startsWith("{"))
+		.map((line) => JSON.parse(line) as YtEntry)
+		.flatMap((entry): WishCandidate[] => {
+			const link =
+				entry.webpage_url ??
+				entry.url ??
+				(site === "youtube"
+					? `https://www.youtube.com/watch?v=${entry.id}`
+					: undefined);
+			if (!link || !entry.duration || !/^https?:/i.test(link)) return [];
+			const upload = parseUpload(entry.title);
+			const artist =
+				upload.artist ??
+				(entry.channel ?? entry.uploader ?? "").replace(/\s+-\s+Topic$/, "");
+			return [
+				{
+					title: upload.title,
+					artists: artist ? [artist] : [],
+					durationMs: Math.round(entry.duration * 1000),
+					coverUrl:
+						entry.thumbnails?.at(-1)?.url ??
+						(site === "youtube"
+							? `https://i.ytimg.com/vi/${entry.id}/mqdefault.jpg`
+							: undefined),
+					linkUrl: link,
+					source: site,
+					input: link,
+				},
+			];
+		});
+}
+
+export type SearchDeps = {
+	deezer?: (query: string) => Promise<WishCandidate[]>;
+	run?: RunYtDlp;
+};
+
+/** Deezer first, then SoundCloud and YouTube; a source that fails or times out is named in `unreachable`. */
+export async function searchCandidates(
+	query: string,
+	deps: SearchDeps = {},
+): Promise<{ candidates: WishCandidate[]; unreachable: string[] }> {
+	const run = deps.run ?? makeRunner({});
+	const sources = {
+		deezer: (deps.deezer ?? deezerCandidates)(query),
+		soundcloud: mediaSearch("soundcloud", query, run, 3),
+		youtube: mediaSearch("youtube", query, run, 3),
+	};
+	const names = Object.keys(sources) as (keyof typeof sources)[];
+	const settled = await Promise.allSettled(Object.values(sources));
+	const found = (name: keyof typeof sources): WishCandidate[] => {
+		const result = settled[names.indexOf(name)];
+		return result?.status === "fulfilled" ? result.value : [];
+	};
+	return {
+		candidates: [
+			...found("deezer").slice(0, 4),
+			...found("youtube").slice(0, 2),
+			...found("soundcloud").slice(0, 2),
+		],
+		unreachable: names.filter((_, i) => settled[i]?.status === "rejected"),
+	};
 }
