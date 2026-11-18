@@ -1,6 +1,13 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { access, chmod, mkdir, readdir, writeFile } from "node:fs/promises";
+import {
+	access,
+	chmod,
+	mkdir,
+	readdir,
+	rename,
+	writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -64,22 +71,34 @@ async function exists(p: string) {
 	}
 }
 
-// Debian's yt-dlp is too old for YouTube; the standalone release is fetched once when none is installed.
+let download: Promise<string> | null = null;
+
+async function fetchYtDlp(): Promise<string> {
+	const cached = path.join(tmpdir(), "lyterion-yt-dlp");
+	if (!(await exists(cached))) {
+		const res = await fetch(RELEASE_URL);
+		if (!res.ok)
+			throw new Error(`could not download yt-dlp: HTTP ${res.status}`);
+		const partial = `${cached}.${process.pid}`;
+		await writeFile(partial, Buffer.from(await res.arrayBuffer()));
+		await chmod(partial, 0o755);
+		await rename(partial, cached);
+	}
+	return cached;
+}
+
+// Last resort: the images ship a pinned yt-dlp (LYTERION_YTDLP_PATH); otherwise the standalone release is fetched once.
 export async function resolveYtDlp(binary?: string): Promise<string> {
 	if (binary) return binary;
 	try {
 		await exec("yt-dlp", ["--version"]);
 		return "yt-dlp";
 	} catch {}
-	const cached = path.join(tmpdir(), "lyterion-yt-dlp");
-	if (!(await exists(cached))) {
-		const res = await fetch(RELEASE_URL);
-		if (!res.ok)
-			throw new Error(`could not download yt-dlp: HTTP ${res.status}`);
-		await writeFile(cached, Buffer.from(await res.arrayBuffer()));
-		await chmod(cached, 0o755);
-	}
-	return cached;
+	download ??= fetchYtDlp().catch((err) => {
+		download = null;
+		throw err;
+	});
+	return download;
 }
 
 const TOPIC = /\s+-\s+Topic$/;

@@ -211,12 +211,13 @@ const waiting: (() => void)[] = [];
 async function withSlot<T>(task: () => Promise<T>): Promise<T> {
 	if (searching >= MEDIA_SEARCH_CONCURRENCY)
 		await new Promise<void>((resolve) => waiting.push(resolve));
-	searching++;
+	else searching++;
 	try {
 		return await task();
 	} finally {
-		searching--;
-		waiting.shift()?.();
+		const next = waiting.shift();
+		if (next) next();
+		else searching--;
 	}
 }
 

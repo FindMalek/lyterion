@@ -217,3 +217,57 @@ describe("searchCandidates arguments", () => {
 		expect(await deezerCandidates("teardrop", jsonFetch(hits))).toHaveLength(1);
 	});
 });
+
+describe("searchCandidates sources", () => {
+	const none = async () => [];
+
+	it("takes a flat soundcloud entry that only has a url", async () => {
+		const run = async (args: string[]) =>
+			args.some((a) => a.startsWith("scsearch"))
+				? `${JSON.stringify({ id: "1", title: "Teardrop", duration: 320, uploader: "MA", url: "https://soundcloud.com/ma/teardrop" })}\n`
+				: "";
+		const { candidates } = await searchCandidates("teardrop", {
+			deezer: none,
+			run,
+		});
+		expect(candidates).toMatchObject([
+			{ source: "soundcloud", input: "https://soundcloud.com/ma/teardrop" },
+		]);
+	});
+
+	it("still returns deezer when both yt-dlp searches fail, and names them", async () => {
+		const deezer = async () => [
+			{
+				title: "Teardrop",
+				artists: ["MA"],
+				durationMs: 1,
+				source: "deezer" as const,
+				input: "https://www.deezer.com/track/7",
+			},
+		];
+		const run = async () => {
+			throw new Error("down");
+		};
+		const found = await searchCandidates("teardrop", { deezer, run });
+		expect(found.candidates.map((c) => c.source)).toEqual(["deezer"]);
+		expect(found.unreachable).toEqual(["soundcloud", "youtube"]);
+	});
+
+	it("never runs more than four yt-dlp searches at once", async () => {
+		let live = 0;
+		let peak = 0;
+		const run = async () => {
+			live++;
+			peak = Math.max(peak, live);
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			live--;
+			return "";
+		};
+		await Promise.all(
+			Array.from({ length: 6 }, (_, i) =>
+				searchCandidates(`q${i}`, { deezer: none, run }),
+			),
+		);
+		expect(peak).toBe(4);
+	});
+});
