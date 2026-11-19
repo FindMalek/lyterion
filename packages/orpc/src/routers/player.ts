@@ -3,7 +3,7 @@ import { followedArtists } from "@lyterion/common/library/followed-artists";
 import { playerSummary } from "@lyterion/common/library/player-summary";
 import { StartRunError } from "@lyterion/common/pipeline/start";
 import { addWish, wishState } from "@lyterion/common/wishlist/add";
-import { quickWish } from "@lyterion/common/wishlist/resolve";
+import { quickWish, searchCandidates } from "@lyterion/common/wishlist/resolve";
 import { env } from "@lyterion/env/server";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
@@ -49,6 +49,19 @@ export const playerRouter = {
 				});
 			}
 		}),
+	// Songs a typed name could be, for the player to pick from.
+	wishlistSearch: playerProcedure
+		.route({ method: "POST", path: "/player/wishlist/search" })
+		.input(z.object({ input: z.string().trim().min(2).max(300) }))
+		.handler(({ input }) =>
+			searchCandidates(input.input, {
+				youtubeOptions: {
+					cookiesPath: env.LYTERION_YTDLP_COOKIES_PATH,
+					potProviderUrl: env.LYTERION_YTDLP_POT_PROVIDER_URL,
+					binary: env.LYTERION_YTDLP_PATH,
+				},
+			}),
+		),
 	wishlistAdd: playerProcedure
 		.route({ method: "POST", path: "/player/wishlist" })
 		.input(z.object({ input: z.string().trim().min(2).max(300) }))

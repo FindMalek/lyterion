@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { deezerMeta, quickWish, resolveWish } from "../resolve";
+import {
+	deezerCandidates,
+	deezerMeta,
+	quickWish,
+	resolveWish,
+	searchCandidates,
+} from "../resolve";
 
 const deezerFetch = (async (url: string) => ({
 	ok: true,
@@ -111,5 +117,157 @@ describe("quickWish", () => {
 			artists: ["Forss"],
 			source: "soundcloud",
 		});
+	});
+});
+
+describe("deezerCandidates", () => {
+	it("lists hits with the track link the add takes, skipping ones without a length", async () => {
+		const hits = {
+			data: [
+				{
+					id: 7,
+					title: "Teardrop",
+					duration: 327,
+					artist: { name: "Massive Attack" },
+				},
+				{
+					id: 8,
+					title: "Broken",
+					duration: 0,
+					artist: { name: "Massive Attack" },
+				},
+			],
+		};
+		expect(await deezerCandidates("teardrop", jsonFetch(hits))).toMatchObject([
+			{
+				title: "Teardrop",
+				artists: ["Massive Attack"],
+				durationMs: 327000,
+				source: "deezer",
+				input: "https://www.deezer.com/track/7",
+			},
+		]);
+	});
+});
+
+describe("searchCandidates", () => {
+	it("puts deezer first and keeps the rest when a source fails", async () => {
+		const deezer = async () => [
+			{
+				title: "Teardrop",
+				artists: ["Massive Attack"],
+				durationMs: 327000,
+				source: "deezer" as const,
+				input: "https://www.deezer.com/track/7",
+			},
+		];
+		const run = async (args: string[]) => {
+			if (args.some((a) => a.startsWith("scsearch"))) throw new Error("down");
+			return `${JSON.stringify({ id: "abc", title: "Massive Attack - Teardrop", duration: 330, uploader: "MA" })}\n`;
+		};
+		const { candidates: found, unreachable } = await searchCandidates(
+			"teardrop",
+			{ deezer, run },
+		);
+		expect(unreachable).toEqual(["soundcloud"]);
+		expect(found.map((c) => [c.source, c.input])).toEqual([
+			["deezer", "https://www.deezer.com/track/7"],
+			["youtube", "https://www.youtube.com/watch?v=abc"],
+		]);
+		expect(found[1]).toMatchObject({
+			title: "Teardrop",
+			artists: ["Massive Attack"],
+		});
+	});
+});
+
+describe("searchCandidates arguments", () => {
+	it("keeps a typed query inside one argument after the fixed prefix", async () => {
+		const seen: string[][] = [];
+		const run = async (args: string[]) => {
+			seen.push(args);
+			return "";
+		};
+		await searchCandidates("--exec x", { deezer: async () => [], run });
+		await searchCandidates("ytsearch9:foo", { deezer: async () => [], run });
+		expect(seen.map((args) => args.slice(0, 2))).toEqual(
+			seen.map(() => ["--flat-playlist", "--dump-json"]),
+		);
+		expect(seen.map((args) => args[2]).sort()).toEqual([
+			"scsearch3:--exec x",
+			"scsearch3:ytsearch9:foo",
+			"ytsearch3:--exec x",
+			"ytsearch3:ytsearch9:foo",
+		]);
+		expect(seen.every((args) => args.length === 3)).toBe(true);
+	});
+
+	it("does not call deezer unreachable for one hit without an artist", async () => {
+		const hits = {
+			data: [
+				{ id: 1, title: "Orphan", duration: 100 },
+				{
+					id: 2,
+					title: "Teardrop",
+					duration: 327,
+					artist: { name: "Massive Attack" },
+				},
+			],
+		};
+		expect(await deezerCandidates("teardrop", jsonFetch(hits))).toHaveLength(1);
+	});
+});
+
+describe("searchCandidates sources", () => {
+	const none = async () => [];
+
+	it("takes a flat soundcloud entry that only has a url", async () => {
+		const run = async (args: string[]) =>
+			args.some((a) => a.startsWith("scsearch"))
+				? `${JSON.stringify({ id: "1", title: "Teardrop", duration: 320, uploader: "MA", url: "https://soundcloud.com/ma/teardrop" })}\n`
+				: "";
+		const { candidates } = await searchCandidates("teardrop", {
+			deezer: none,
+			run,
+		});
+		expect(candidates).toMatchObject([
+			{ source: "soundcloud", input: "https://soundcloud.com/ma/teardrop" },
+		]);
+	});
+
+	it("still returns deezer when both yt-dlp searches fail, and names them", async () => {
+		const deezer = async () => [
+			{
+				title: "Teardrop",
+				artists: ["MA"],
+				durationMs: 1,
+				source: "deezer" as const,
+				input: "https://www.deezer.com/track/7",
+			},
+		];
+		const run = async () => {
+			throw new Error("down");
+		};
+		const found = await searchCandidates("teardrop", { deezer, run });
+		expect(found.candidates.map((c) => c.source)).toEqual(["deezer"]);
+		expect(found.unreachable).toEqual(["soundcloud", "youtube"]);
+	});
+
+	it("never runs more than four yt-dlp searches at once", async () => {
+		let live = 0;
+		let peak = 0;
+		const run = async () => {
+			live++;
+			peak = Math.max(peak, live);
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			live--;
+			return "";
+		};
+		await Promise.all(
+			Array.from({ length: 6 }, (_, i) =>
+				searchCandidates(`q${i}`, { deezer: none, run }),
+			),
+		);
+		expect(peak).toBe(4);
 	});
 });
