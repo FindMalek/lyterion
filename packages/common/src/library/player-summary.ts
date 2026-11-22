@@ -1,3 +1,4 @@
+import { syncState } from "../spotify/sync-state";
 import { playlistSpecs } from "./playlists-persist";
 
 const MISSING_PER_PLAYLIST = 200;
@@ -13,9 +14,12 @@ export type PlayerPlaylist = {
 /** Every Spotify playlist (and Liked Songs) as keep-player shows it: how much of it is in Navidrome and what isn't. */
 export async function playerSummary(): Promise<{
 	playlists: PlayerPlaylist[];
+	lastSync: string | null;
+	dailySync: boolean;
 }> {
-	const specs = await playlistSpecs();
+	const [specs, state] = await Promise.all([playlistSpecs(), syncState()]);
 	return {
+		...state,
 		playlists: specs.map((spec) => {
 			const missing = spec.entries.filter((entry) => !entry.path);
 			return {
