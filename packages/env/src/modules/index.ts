@@ -2,6 +2,7 @@ export { aiModule } from "./ai";
 export { authModule } from "./auth";
 export { clientModule } from "./client";
 export { dbModule } from "./db";
+export { diagnosticsModule } from "./diagnostics";
 export { libraryModule } from "./library";
 export { navidromeModule } from "./navidrome";
 export { notifyModule } from "./notify";
