@@ -87,12 +87,15 @@ export function resolveIdentity(input: ResolveInput): {
 	const groups = groupRecordings(input.tracks, { overrides: input.overrides });
 
 	const recordingOfTrack = new Map<string, string>();
+	const keptIds = new Set<string>();
 	const recordings: ResolvedRecording[] = groups.map((group) => {
 		// Keep the id a member already had, so files, candidates and playlists stay attached across runs.
+		// A split can leave two groups holding members of one old recording; only the first keeps its id.
 		const kept = group.memberIds
 			.map((id) => input.existingMembers.get(id))
-			.find((id): id is string => !!id);
+			.find((id): id is string => !!id && !keptIds.has(id));
 		const id = kept ?? newId();
+		keptIds.add(id);
 		const preferred = byId.get(group.preferredId) as ResolveTrack;
 		const edgeOf = new Map<string, string>();
 		for (const edge of group.edges) {
