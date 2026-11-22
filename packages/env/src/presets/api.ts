@@ -3,6 +3,7 @@ import { baseEnv } from "../base";
 import {
 	aiModule,
 	authModule,
+	diagnosticsModule,
 	libraryModule,
 	navidromeModule,
 	notifyModule,
@@ -18,6 +19,7 @@ export const apiEnv = createEnv({
 	server: {
 		...aiModule.server,
 		...authModule.server,
+		...diagnosticsModule.server,
 		...libraryModule.server,
 		...navidromeModule.server,
 		...notifyModule.server,

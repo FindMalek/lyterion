@@ -10,6 +10,7 @@ import { indexExistingLibrary } from "../../navidrome/index-persist";
 import { createNativeClient } from "../../navidrome/native";
 import { finishRun } from "../../pipeline/advance";
 import { errorText, updateStageProgress } from "../../pipeline/progress";
+import { reportFailure } from "../../telemetry/report";
 import { ACQUIRE_STAGE } from "./acquire-recording";
 
 const STAGE = "identity.resolve";
@@ -70,6 +71,7 @@ export const identityResolveTask = task({
 			const dispatched = await dispatchAcquire(runId);
 			return { ...summary, acquire: backlog, dispatched };
 		} catch (err) {
+			await reportFailure(STAGE, err, { runId });
 			await updateStageProgress(runId, STAGE, {
 				status: "failed",
 				finishedAt: new Date().toISOString(),

@@ -1,9 +1,10 @@
 import { db } from "@lyterion/db";
 import { migrationRun } from "@lyterion/db/schema/run";
 import { logger, schedules } from "@trigger.dev/sdk";
-import { eq } from "drizzle-orm";
+import { desc, eq, ne } from "drizzle-orm";
 
 import { syncState } from "../../spotify/sync-state";
+import { reportFailure } from "../../telemetry/report";
 import { reapStalledRun } from "./pipeline-watchdog";
 import { spotifyExportTask } from "./spotify-export";
 
@@ -17,6 +18,20 @@ export const spotifySyncTask = schedules.task({
 		if (!state.dailySync)
 			return { skipped: "daily sync is off since the final export" };
 		await reapStalledRun();
+		// A run that fails after the export still moves lastSync, so the last finished run is the honest signal.
+		const [previous] = await db
+			.select({ id: migrationRun.id, status: migrationRun.status })
+			.from(migrationRun)
+			.where(ne(migrationRun.status, "running"))
+			.orderBy(desc(migrationRun.id))
+			.limit(1);
+		if (previous?.status === "failed")
+			await reportFailure(
+				"spotify.sync",
+				new Error(`the previous daily sync (run ${previous.id}) failed`),
+				{ runId: previous.id },
+				"warning",
+			);
 		const [running] = await db
 			.select({ id: migrationRun.id })
 			.from(migrationRun)

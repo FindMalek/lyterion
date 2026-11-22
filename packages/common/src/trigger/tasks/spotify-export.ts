@@ -10,6 +10,7 @@ import {
 	loadIncrementalState,
 	markExported,
 } from "../../spotify/sync-state";
+import { reportFailure } from "../../telemetry/report";
 import { identityResolveTask } from "./identity-resolve";
 
 const STAGE = "spotify.export";
@@ -73,6 +74,7 @@ export const spotifyExportTask = task({
 				await identityResolveTask.trigger({ runId });
 			return summary;
 		} catch (err) {
+			await reportFailure(STAGE, err, { runId });
 			await updateStageProgress(runId, STAGE, {
 				status: "failed",
 				finishedAt: new Date().toISOString(),
