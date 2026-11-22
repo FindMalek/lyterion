@@ -133,6 +133,28 @@ describe("resolveIdentity overrides", () => {
 	});
 });
 
+describe("resolveIdentity split ids", () => {
+	it("gives each group its own id when a split divides one old recording", () => {
+		const tracks = [
+			track({ id: "t-album", isrc: "GBUM71029604", albumId: "mezz" }),
+			track({ id: "t-comp", isrc: "GBUM71029604", albumId: "best" }),
+		];
+		let n = 0;
+		const { recordings } = resolveIdentity({
+			tracks,
+			albums,
+			savedAlbumIds: new Set(),
+			existingMembers: new Map([
+				["t-album", "rec-old"],
+				["t-comp", "rec-old"],
+			]),
+			newId: () => `new-${++n}`,
+			overrides: [{ kind: "split", trackIds: ["t-album", "t-comp"] }],
+		});
+		expect(new Set(recordings.map((r) => r.id)).size).toBe(2);
+	});
+});
+
 describe("releaseType", () => {
 	it("maps Spotify album types, with 4+ track singles as EPs", () => {
 		expect(releaseType("album", 10)).toBe("album");
